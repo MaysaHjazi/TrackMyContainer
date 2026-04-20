@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.github
+.env*
+!.env.example
+migration-dumps
+docs
+*.md
+!README.md
+.vscode
+.idea
+scripts/check-shipments.ts
+scripts/deactivate-arrived.ts
+scripts/verify-dispatcher.ts
+scripts/verify-shipments-page.ts

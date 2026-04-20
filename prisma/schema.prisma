@@ -1,0 +1,416 @@
+// ────────────────────────────────────────────────────────────
+// TrackMyContainer.ai — Prisma Schema
+// ────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTH & USERS
+// ══════════════════════════════════════════════════════════════
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  emailVerified   DateTime?
+  image           String?
+  hashedPassword  String?
+
+  // WhatsApp
+  phone           String?         // E.164 format e.g. +12125551234
+  whatsappOptIn   Boolean         @default(false)
+  whatsappOptInAt DateTime?
+
+  // Facebook Messenger
+  messengerPsid   String?         // Page-Scoped ID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  subscription    Subscription?
+  shipments       Shipment[]
+  notifications   Notification[]
+  trackingQueries TrackingQuery[]
+  apiKeys         ApiKey[]
+  teamMemberships TeamMember[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUBSCRIPTIONS (Stripe)
+// ══════════════════════════════════════════════════════════════
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+
+  // Stripe
+  stripeCustomerId     String             @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+
+  // Plan
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+
+  // Billing cycle
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialEnd             DateTime?
+
+  // Feature gates (denormalized for fast access)
+  maxTrackedShipments  Int                @default(0)
+  maxDailyQueries      Int                @default(5)
+  whatsappEnabled      Boolean            @default(false)
+  apiAccessEnabled     Boolean            @default(false)
+  maxTeamMembers       Int                @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  UNPAID
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+}
+
+// ══════════════════════════════════════════════════════════════
+// SHIPMENTS & TRACKING
+// ══════════════════════════════════════════════════════════════
+
+model Shipment {
+  id              String         @id @default(cuid())
+  userId          String
+
+  // Identification
+  trackingNumber  String         // Container # or AWB
+  type            ShipmentType
+  carrier         String?        // Carrier name
+  carrierCode     String?        // SCAC or IATA prefix
+
+  // User metadata
+  nickname        String?        // User-defined label (e.g. "Order #1234")
+  reference       String?        // Customer PO or reference
+
+  // Route
+  origin          String?        // Origin port / airport name
+  originCode      String?        // Port/airport LOCODE or IATA code
+  destination     String?
+  destinationCode String?
+
+  // Vessel / flight
+  vesselName      String?
+  voyageNumber    String?
+  flightNumber    String?
+
+  // Status
+  currentStatus   ShipmentStatus @default(UNKNOWN)
+  currentLocation String?
+
+  // Dates
+  etdDate         DateTime?      // Estimated time of departure
+  atdDate         DateTime?      // Actual time of departure
+  etaDate         DateTime?      // Estimated time of arrival
+  ataDate         DateTime?      // Actual time of arrival
+
+  // Polling
+  lastPolledAt    DateTime?
+  pollFrequencyMins Int          @default(360)  // 6 hours
+  isActive        Boolean        @default(true)
+
+  // Notifications per shipment
+  notifyWhatsapp  Boolean        @default(false)
+  notifyEmail     Boolean        @default(true)
+  notifyMessenger Boolean        @default(false)
+
+  // User preferences
+  isFavorite      Boolean        @default(false)
+
+  // Sharing
+  shareToken      String?        @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackingEvents TrackingEvent[]
+  notifications  Notification[]
+
+  @@unique([userId, trackingNumber])
+  @@index([trackingNumber])
+  @@index([userId, isActive])
+  @@index([currentStatus])
+  @@index([etaDate])
+  @@index([shareToken])
+  @@map("shipments")
+}
+
+enum ShipmentType {
+  SEA
+  AIR
+}
+
+enum ShipmentStatus {
+  UNKNOWN
+  BOOKED
+  PICKED_UP
+  IN_TRANSIT
+  TRANSSHIPMENT
+  AT_PORT
+  CUSTOMS_HOLD
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELAYED
+  EXCEPTION
+}
+
+model TrackingEvent {
+  id          String        @id @default(cuid())
+  shipmentId  String
+
+  status      ShipmentStatus
+  location    String?
+  description String
+  eventDate   DateTime
+
+  // Provider data
+  source      String        // e.g. "shipsgo", "maersk", "airrates"
+  rawData     Json?         // Original API response for debugging/auditing
+
+  createdAt   DateTime      @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, eventDate])
+  @@index([shipmentId, status])
+  @@map("tracking_events")
+}
+
+// ══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════════════════════════════
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String
+  shipmentId  String?
+
+  channel     NotificationChannel
+  type        NotificationType
+  subject     String?
+  body        String              @db.Text
+
+  status      NotificationStatus  @default(PENDING)
+  externalId  String?             // Twilio SID, Meta msg ID, Resend ID
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  error       String?
+
+  createdAt   DateTime            @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipment Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([shipmentId])
+  @@map("notifications")
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  MESSENGER
+  IN_APP
+}
+
+enum NotificationType {
+  ETA_UPDATE
+  ETA_IMMINENT     // ETA in ≤ 3 days
+  DELAY_ALERT
+  ARRIVAL_NOTICE
+  STATUS_CHANGE
+  CUSTOMS_HOLD
+  EXCEPTION
+  WELCOME
+  SUBSCRIPTION_CHANGE
+  SUBSCRIPTION_EXPIRING
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+// ══════════════════════════════════════════════════════════════
+// RATE LIMITING & QUERY LOG
+// ══════════════════════════════════════════════════════════════
+
+model TrackingQuery {
+  id             String       @id @default(cuid())
+  userId         String?      // null for anonymous
+  trackingNumber String
+  type           ShipmentType
+  ipAddress      String?
+  userAgent      String?
+  responseTimeMs Int?
+  cacheHit       Boolean      @default(false)
+  provider       String?      // Which provider was used
+  createdAt      DateTime     @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([ipAddress, createdAt])
+  @@map("tracking_queries")
+}
+
+// ══════════════════════════════════════════════════════════════
+// API KEYS (Business tier)
+// ══════════════════════════════════════════════════════════════
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String    // e.g. "Production", "Test"
+  keyHash   String    @unique  // hashed for storage
+  prefix    String    // first 8 chars shown in UI: "tmc_1234..."
+  lastUsed  DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// ══════════════════════════════════════════════════════════════
+// TEAMS (Business tier)
+// ══════════════════════════════════════════════════════════════
+
+model Team {
+  id        String       @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  members TeamMember[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id     String   @id @default(cuid())
+  teamId String
+  userId String
+  role   TeamRole @default(MEMBER)
+
+  addedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ══════════════════════════════════════════════════════════════
+// WHATSAPP SESSIONS
+// ══════════════════════════════════════════════════════════════
+
+model WhatsappSession {
+  id            String    @id @default(cuid())
+  phoneNumber   String    @unique  // E.164
+  userId        String?            // linked account (if registered)
+  state         String    @default("idle")  // conversation state machine
+  context       Json?              // temporary conversation context
+  isOptedIn     Boolean   @default(false)
+  optInAt       DateTime?
+  optOutAt      DateTime?
+  lastMessageAt DateTime?
+  messageCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("whatsapp_sessions")
+}

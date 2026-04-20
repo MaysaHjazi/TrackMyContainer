@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1.6
+FROM node:20-alpine
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci --ignore-scripts
+
+COPY . .
+RUN npx prisma generate
+
+ENV NODE_ENV=production
+USER node
+CMD ["npx", "tsx", "src/backend/worker/index.ts"]

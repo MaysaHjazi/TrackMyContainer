@@ -1,0 +1,21 @@
+{
+  "name": "TrackMyContainer",
+  "short_name": "TrackMyContainer",
+  "description": "Track sea and air shipments in real time",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060E1E",
+  "theme_color": "#1B2B5E",
+  "icons": [
+    {
+      "src": "/images/logo-mark.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/logo-mark.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
