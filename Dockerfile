@@ -8,7 +8,7 @@ WORKDIR /app
 # ---- deps ----
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --legacy-peer-deps
 
 # ---- build ----
 FROM base AS build
