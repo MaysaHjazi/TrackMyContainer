@@ -141,7 +141,15 @@ export class JsonCargoProvider implements TrackingProvider {
 
     // JSONCargo returns 500 instead of 404 for containers not in their DB (server bug)
     if (res.status === 404 || res.status === 500) {
-      return this.failure(trackingNumber, "Container not found in JSONCargo");
+      // Try to surface the specific JSONCargo error message — e.g.
+      // "Container with tracking number X does not exist for MAERSK provider.
+      //  Check if the number is correct and in proper format."
+      let specificMsg = "Container not found. Check if the number is correct and you selected the right carrier.";
+      try {
+        const errJson = await res.json() as { error?: { title?: string; detail?: string } };
+        specificMsg = errJson.error?.title ?? errJson.error?.detail ?? specificMsg;
+      } catch { /* body wasn't JSON, keep default */ }
+      return this.failure(trackingNumber, specificMsg);
     }
 
     if (res.status === 400) {

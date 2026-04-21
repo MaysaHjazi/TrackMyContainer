@@ -142,11 +142,15 @@ export async function trackShipment(
       ? lastError
       : null;
 
+  // Avoid double-mentioning the tracking number if the provider already included it
+  if (specificFromProvider) {
+    throw new TrackingError(specificFromProvider, "NO_DATA");
+  }
+
   const hint =
-    specificFromProvider ??
-    (type === "SEA"
+    type === "SEA"
       ? "Container not found in any carrier database. Verify the number is typed correctly — it may also be too new for the carrier to report yet."
-      : "Only LH (020-) and QR (157-) AWBs are currently supported.");
+      : "Only LH (020-) and QR (157-) AWBs are currently supported.";
 
   throw new TrackingError(
     `No tracking data for ${normalized}. ${hint}`,
