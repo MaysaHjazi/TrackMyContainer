@@ -141,16 +141,23 @@ const SINAY_MAP: StatusMap = {
 // ── JSONCargo — ocean container status strings ────────────────
 const JSONCARGO_MAP: StatusMap = {
   "empty to shipper":            "BOOKED",
+  "empty received at cy":        "DELIVERED",
   "gate in":                     "PICKED_UP",
+  "loaded on board":             "IN_TRANSIT",
   "loaded on vessel":            "IN_TRANSIT",
   "in transit":                  "IN_TRANSIT",
   "departed":                    "IN_TRANSIT",
   "vessel departed":             "IN_TRANSIT",
+  "loaded on transshipment":     "TRANSSHIPMENT",
+  "load on transshipment":       "TRANSSHIPMENT",
   "transshipment":               "TRANSSHIPMENT",
   "transshipment discharge":     "TRANSSHIPMENT",
+  "discharged in transshipment": "TRANSSHIPMENT",
   "arrived":                     "AT_PORT",
   "vessel arrived":              "AT_PORT",
+  "vessel arrival":              "AT_PORT",
   "discharged":                  "AT_PORT",
+  "discharge":                   "AT_PORT",  // JSONCargo sometimes without "d"
   "at port":                     "AT_PORT",
   "last seen at":                "IN_TRANSIT",
   "gate out":                    "OUT_FOR_DELIVERY",
