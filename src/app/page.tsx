@@ -1,10 +1,11 @@
-import { Header }      from "@/frontend/components/layout/header";
-import { Hero }         from "@/frontend/components/marketing/hero";
-import { HowItWorks }   from "@/frontend/components/marketing/how-it-works";
-import { Features }     from "@/frontend/components/marketing/features";
-import { PricingCards } from "@/frontend/components/marketing/pricing-cards";
-import { CtaSection }   from "@/frontend/components/marketing/cta-section";
-import { Footer }       from "@/frontend/components/layout/footer";
+import { Header }          from "@/frontend/components/layout/header";
+import { Hero }             from "@/frontend/components/marketing/hero";
+import { KineticHeadline }  from "@/frontend/components/marketing/kinetic-headline";
+import { HowItWorks }       from "@/frontend/components/marketing/how-it-works";
+import { Features }         from "@/frontend/components/marketing/features";
+import { PricingCards }     from "@/frontend/components/marketing/pricing-cards";
+import { CtaSection }       from "@/frontend/components/marketing/cta-section";
+import { Footer }           from "@/frontend/components/layout/footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function LandingPage() {
       <Header />
       <main>
         <Hero />
+        <KineticHeadline />
         <HowItWorks />
         <Features />
         <PricingCards />
