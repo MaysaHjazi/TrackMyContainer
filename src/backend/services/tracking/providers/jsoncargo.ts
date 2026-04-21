@@ -87,7 +87,9 @@ interface JsonCargoResponse {
     current_voyage_number?:     string;
     last_updated?:              string;
   };
-  error?:   string;
+  // JSONCargo returns error as an object `{ title: "..." }` on 200 when the
+  // container is unknown, or occasionally as a plain string. Support both.
+  error?:   string | { title?: string; detail?: string };
   message?: string;
 }
 
@@ -164,7 +166,13 @@ export class JsonCargoProvider implements TrackingProvider {
     }
 
     if (!json.data) {
-      return this.failure(trackingNumber, json.error ?? json.message ?? "No data returned");
+      // Extract the human-readable message whether `error` came back as a
+      // string or as `{ title, detail }`.
+      const errMsg =
+        typeof json.error === "string"
+          ? json.error
+          : json.error?.title ?? json.error?.detail ?? json.message ?? "No data returned";
+      return this.failure(trackingNumber, errMsg);
     }
 
     const d = json.data;

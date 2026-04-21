@@ -134,14 +134,22 @@ export async function trackShipment(
     }
   }
 
-  // 4. All providers exhausted — clear error, no fake data
+  // 4. All providers exhausted — surface the most specific error we got.
+  // If a provider gave a clear "not found" / "invalid" reason, use it;
+  // otherwise fall back to a generic hint.
+  const specificFromProvider =
+    lastError && /not exist|not found|invalid|check.*number|proper format/i.test(lastError)
+      ? lastError
+      : null;
+
   const hint =
-    type === "SEA"
-      ? " No movement data found. The container may not be active yet."
-      : " Only LH (020-) and QR (157-) AWBs are currently supported.";
+    specificFromProvider ??
+    (type === "SEA"
+      ? "Container not found in any carrier database. Verify the number is typed correctly — it may also be too new for the carrier to report yet."
+      : "Only LH (020-) and QR (157-) AWBs are currently supported.");
 
   throw new TrackingError(
-    `No tracking data found for ${normalized}.${hint}`,
+    `No tracking data for ${normalized}. ${hint}`,
     "NO_DATA",
   );
 }
