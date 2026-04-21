@@ -15,9 +15,9 @@ import { motion, useScroll, useTransform, type MotionValue } from "framer-motion
  * word matching the desired initials (J-A-S here).
  */
 
-const WORDS = ["Journey", "Across", "Seas"];
-const TOP_LABEL = "Every container takes a";
-const BOTTOM_LABEL = "Track yours in real-time, from port to door.";
+const WORDS = ["Journey", "Air", "Sea"];
+const TOP_LABEL = "One platform for your";
+const BOTTOM_LABEL = "Sea containers and air cargo, tracked in real-time — worldwide.";
 
 /* ── Single animated word unit ── */
 function AnimatedWord({
