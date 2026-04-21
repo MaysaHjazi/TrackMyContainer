@@ -153,12 +153,15 @@ const JSONCARGO_MAP: StatusMap = {
   "transshipment":               "TRANSSHIPMENT",
   "transshipment discharge":     "TRANSSHIPMENT",
   "discharged in transshipment": "TRANSSHIPMENT",
+  "arrived at destination":      "AT_PORT",
   "arrived":                     "AT_PORT",
   "vessel arrived":              "AT_PORT",
   "vessel arrival":              "AT_PORT",
-  "discharged":                  "AT_PORT",
-  "discharge":                   "AT_PORT",  // JSONCargo sometimes without "d"
+  "discharged":                  "AT_PORT",      // only when explicitly at destination
   "at port":                     "AT_PORT",
+  // NOTE: bare "discharge" (without context) intentionally NOT mapped — it's
+  // ambiguous (can mean transshipment OR final). The provider must emit a
+  // location-qualified status (e.g. "Transshipment Discharge" vs "Arrived").
   "last seen at":                "IN_TRANSIT",
   "gate out":                    "OUT_FOR_DELIVERY",
   "delivered":                   "DELIVERED",

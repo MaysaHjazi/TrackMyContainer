@@ -185,13 +185,22 @@ export class JsonCargoProvider implements TrackingProvider {
 
     const d = json.data;
 
-    // ── Build synthetic events from available fields ───────────
-    // JSONCargo MARINER plan returns a summary view (not full event history).
-    // We fan these out into as many separate events as the data allows, so
-    // the UI's timeline shows meaningful progression.
+    // ── Build events strictly from JSONCargo fields ──────────────
+    // Every event below corresponds to an explicit JSONCargo-provided
+    // timestamp. We do NOT invent intermediate events — the MARINER plan
+    // only surfaces a summary view, so we honor what's given.
     const events: ProviderEvent[] = [];
 
-    // 1. Departure from origin port
+    // The key fact for status: is the container at its final destination?
+    const isAtDestination = !!(d.last_location && d.shipped_to &&
+      d.last_location.trim().toUpperCase() === d.shipped_to.trim().toUpperCase());
+
+    // Preserve the JSONCargo status verbatim for display, but strip the
+    // trailing "(VESSEL / VOYAGE)" suffix so it reads cleanly as a label.
+    const jcStatusRaw   = (d.container_status ?? "").trim();
+    const jcStatusClean = jcStatusRaw.replace(/\s*\(.*\)\s*$/, "").trim();
+
+    // ── Event 1: departure from origin (atd_origin) ──────────────
     const departureTime = parseJCDate(d.atd_origin);
     if (departureTime && d.shipped_from) {
       events.push({
@@ -202,39 +211,53 @@ export class JsonCargoProvider implements TrackingProvider {
       });
     }
 
-    // 2. Departure FROM last known port (if different from origin) — vessel change / transshipment
-    const lastDeparture = parseJCDate(d.atd_last_location);
-    if (lastDeparture && d.last_location && d.last_location !== d.shipped_from) {
-      events.push({
-        rawStatus:   "Loaded on Transshipment",
-        location:    d.last_location,
-        description: `Loaded on transshipment at ${d.last_location}${d.last_location_terminal ? ` — ${d.last_location_terminal}` : ""}${d.current_vessel_name && d.current_vessel_name !== d.last_vessel_name ? ` (transferred to ${d.current_vessel_name})` : ""}`,
-        timestamp:   lastDeparture,
-      });
-    }
-
-    // 3. Last movement / current position
-    const lastMovement = parseJCDate(d.timestamp_of_last_location ?? d.last_movement_timestamp);
+    // ── Event 2: latest observation (timestamp_of_last_location) ──
+    const lastMovement = parseJCDate(
+      d.timestamp_of_last_location ?? d.last_movement_timestamp ?? d.last_updated,
+    );
     if (lastMovement && d.last_location) {
-      const isAtDest = d.last_location === d.shipped_to;
-      // Use JSONCargo's reported container_status so the normalizer can map it;
-      // strip any trailing "(VESSEL / VOYAGE)" noise which confuses the normalizer.
-      const cleanStatus = (d.container_status ?? "").replace(/\s*\(.*\)\s*$/, "").trim();
+      // Decide status from LOCATION vs DESTINATION, not from the ambiguous
+      // container_status string. "Discharge" at a transit port means
+      // transshipment; the SAME word at the destination means arrival.
+      let rawStatus: string;
+      let description: string;
+      const terminalSuffix = d.last_location_terminal ? ` — ${d.last_location_terminal}` : "";
+      const vesselSuffix   = d.current_vessel_name
+        ? ` (vessel: ${d.current_vessel_name}${d.current_voyage_number ? ` ${d.current_voyage_number}` : ""})`
+        : "";
+
+      if (isAtDestination) {
+        // At the final port — honor whichever arrival-ish phrase JSONCargo gave.
+        rawStatus   = jcStatusClean && /discharge|arriv|deliver/i.test(jcStatusClean)
+                        ? jcStatusClean
+                        : "Arrived";
+        description = `${rawStatus} at ${d.last_location}${terminalSuffix}${vesselSuffix}`;
+      } else if (/discharge/i.test(jcStatusClean)) {
+        rawStatus   = "Transshipment Discharge";
+        description = `Discharged at transshipment port ${d.last_location}${terminalSuffix}${vesselSuffix}`;
+      } else if (/load/i.test(jcStatusClean)) {
+        rawStatus   = "Loaded on Transshipment";
+        description = `Loaded for onward shipment at ${d.last_location}${terminalSuffix}${vesselSuffix}`;
+      } else {
+        // Fall back to JSONCargo's own phrasing untouched
+        rawStatus   = jcStatusClean || "In Transit";
+        description = `${jcStatusClean || "Last seen at"} ${d.last_location}${terminalSuffix}${vesselSuffix}`;
+      }
+
       events.push({
-        rawStatus:   isAtDest ? "Arrived" : (cleanStatus || "In Transit"),
-        location:    d.last_location,
-        description: `${isAtDest ? "Arrived at" : (cleanStatus || "Last seen at")} ${d.last_location}${d.last_location_terminal ? ` — ${d.last_location_terminal}` : ""}`,
-        timestamp:   lastMovement,
+        rawStatus,
+        location: d.last_location,
+        description,
+        timestamp: lastMovement,
       });
     }
 
-    // If we have no events at all, use the current status as a fallback
-    if (events.length === 0 && d.container_status) {
-      const cleanStatus = d.container_status.replace(/\s*\(.*\)\s*$/, "").trim();
+    // If we have no events at all, surface whatever status JSONCargo gave.
+    if (events.length === 0 && jcStatusClean) {
       events.push({
-        rawStatus:   cleanStatus || d.container_status,
+        rawStatus:   jcStatusClean,
         location:    d.last_location ?? d.shipped_from ?? "Unknown",
-        description: d.container_status,
+        description: jcStatusRaw || jcStatusClean,
         timestamp:   parseJCDate(d.last_updated) ?? new Date(),
       });
     }
