@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     image: tmc/next-app:latest
     container_name: tmc-next-app
     restart: unless-stopped
@@ -15,7 +19,6 @@ services:
       - tmc-net
     depends_on:
       - worker
-    # No ports published — NPM reaches it via internal network
 
   worker:
     build:

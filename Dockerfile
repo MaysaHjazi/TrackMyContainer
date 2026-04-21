@@ -14,6 +14,16 @@ RUN npm ci --ignore-scripts --legacy-peer-deps
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Public env vars must be present at build time — Next.js bakes NEXT_PUBLIC_*
+# values into the client bundle during `next build`.
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
