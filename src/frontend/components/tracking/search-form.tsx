@@ -33,11 +33,11 @@ export function TrackSearchForm() {
       {/* Type indicator */}
       <div className="ml-4 flex-shrink-0">
         {detectedType === "SEA" ? (
-          <Ship size={20} className="text-teal-500" />
+          <Ship size={20} className="text-teal-500 dark:text-teal-400" />
         ) : detectedType === "AIR" ? (
-          <Plane size={20} className="text-orange-500" />
+          <Plane size={20} className="text-orange-500 dark:text-orange-400" />
         ) : (
-          <Search size={20} className="text-navy-300" />
+          <Search size={20} className="text-navy-300 dark:text-navy-500" />
         )}
       </div>
 
@@ -46,8 +46,10 @@ export function TrackSearchForm() {
         value={query}
         onChange={(e) => { setQuery(e.target.value.toUpperCase()); setError(""); }}
         placeholder="Enter Container or AWB Number"
-        className="flex-1 bg-transparent py-4 px-3 text-base font-mono text-navy-600
-                   placeholder:text-navy-300 placeholder:font-sans focus:outline-none"
+        className="flex-1 bg-transparent py-4 px-3 text-base font-mono
+                   text-navy-600 placeholder:text-navy-300
+                   dark:text-white dark:placeholder:text-navy-500
+                   placeholder:font-sans focus:outline-none"
         autoComplete="off"
         spellCheck={false}
         autoCapitalize="characters"
@@ -57,8 +59,8 @@ export function TrackSearchForm() {
       {detectedType && detectedType !== "UNKNOWN" && (
         <div className={`mr-2 flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
           detectedType === "SEA"
-            ? "bg-teal-100 text-teal-600"
-            : "bg-orange-100 text-orange-600"
+            ? "bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300"
+            : "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300"
         }`}>
           {detectedType === "SEA" ? "🚢 Sea" : "✈️ Air"}
         </div>

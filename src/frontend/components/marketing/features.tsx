@@ -37,9 +37,18 @@ const FEATURES = [
 ];
 
 const COLOR_MAP = {
-  teal:   { icon: "bg-teal-500/15 text-teal-400", glow: "group-hover:shadow-teal-500/10" },
-  orange: { icon: "bg-orange-500/15 text-orange-400", glow: "group-hover:shadow-orange-500/10" },
-  navy:   { icon: "bg-navy-700 text-navy-200", glow: "group-hover:shadow-navy-500/10" },
+  teal:   {
+    icon: "bg-[#EEF5FF] text-[#3B82F6] dark:bg-teal-500/15 dark:text-teal-400",
+    glow: "dark:group-hover:shadow-teal-500/10"
+  },
+  orange: {
+    icon: "bg-[#FFF4EC] text-[#FF6A00] dark:bg-orange-500/15 dark:text-orange-400",
+    glow: "dark:group-hover:shadow-orange-500/10"
+  },
+  navy:   {
+    icon: "bg-[#F5F7FA] text-[#6B7280] dark:bg-navy-700 dark:text-navy-200",
+    glow: "dark:group-hover:shadow-navy-500/10"
+  },
 };
 
 const cardVariants: Variants = {
@@ -70,9 +79,12 @@ const iconVariants: Variants = {
 
 export function Features() {
   return (
-    <section className="relative py-24 bg-navy-950 overflow-hidden">
+    <section className="relative py-24 overflow-hidden
+                        bg-[#F5F7FA] dark:bg-navy-950">
       {/* Subtle top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-navy-700 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r
+                      from-transparent via-[#E5E7EB] to-transparent
+                      dark:via-navy-700" />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
@@ -82,15 +94,19 @@ export function Features() {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
+          <h2 className="text-3xl font-extrabold sm:text-4xl
+                         text-[#1F2937] dark:text-white">
             Everything you need to track{" "}
-            <span className="bg-gradient-to-r from-teal-400 to-orange-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r bg-clip-text text-transparent
+                             from-[#3B82F6] to-[#FF6A00]
+                             dark:from-teal-400 dark:to-orange-400">
               global shipments
             </span>
           </h2>
-          <p className="mt-4 text-lg text-navy-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-lg max-w-2xl mx-auto
+                        text-[#6B7280] dark:text-navy-400">
             From a single free lookup to a full dashboard with automated alerts —
-            Container<span className="text-orange-400"> Tracking</span> covers it all.
+            Container<span className="text-[#FF6A00] dark:text-orange-400"> Tracking</span> covers it all.
           </p>
         </motion.div>
 
@@ -105,8 +121,11 @@ export function Features() {
                 whileInView="visible"
                 viewport={{ once: true, margin: "-50px" }}
                 custom={i}
-                className={`group relative rounded-2xl border border-navy-800 bg-gradient-to-br from-navy-900 to-navy-950 p-7
-                           hover:border-navy-700 transition-all duration-300 hover:shadow-xl ${c.glow}`}
+                className={`group relative rounded-2xl p-7 transition-all duration-300
+                           border bg-white border-[#E5E7EB] shadow-[0_2px_10px_rgba(0,0,0,0.04)]
+                           hover:border-[#D1D5DB] hover:shadow-[0_10px_30px_rgba(0,0,0,0.08)]
+                           dark:border-navy-800 dark:bg-gradient-to-br dark:from-navy-900 dark:to-navy-950 dark:shadow-none
+                           dark:hover:border-navy-700 dark:hover:shadow-xl ${c.glow}`}
               >
                 <motion.div
                   variants={iconVariants}
@@ -118,8 +137,8 @@ export function Features() {
                 >
                   <Icon size={22} />
                 </motion.div>
-                <h3 className="mb-2 text-base font-bold text-white">{title}</h3>
-                <p className="text-sm leading-relaxed text-navy-400">{description}</p>
+                <h3 className="mb-2 text-base font-bold text-[#1F2937] dark:text-white">{title}</h3>
+                <p className="text-sm leading-relaxed text-[#6B7280] dark:text-navy-400">{description}</p>
               </motion.div>
             );
           })}

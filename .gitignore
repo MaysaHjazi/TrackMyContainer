@@ -42,3 +42,6 @@ yarn-error.log*
 .vscode/
 .idea/
 *.swp
+
+# Superpowers brainstorming sessions
+.superpowers/

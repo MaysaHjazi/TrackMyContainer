@@ -20,7 +20,7 @@ const STATUS_DOT: Record<string, string> = {
 
 export function StatusTimeline({ events, type }: Props) {
   if (!events.length) {
-    return <p className="text-sm text-navy-400 text-center py-8">No tracking events available yet.</p>;
+    return <p className="text-sm text-navy-400 dark:text-navy-500 text-center py-8">No tracking events available yet.</p>;
   }
 
   // Reverse so newest is at top
@@ -39,14 +39,14 @@ export function StatusTimeline({ events, type }: Props) {
           <li key={idx} className="relative flex gap-4 pb-6 last:pb-0">
             {/* Vertical line */}
             {idx < sorted.length - 1 && (
-              <div className="absolute left-3.5 top-7 bottom-0 w-px bg-navy-100"/>
+              <div className="absolute left-3.5 top-7 bottom-0 w-px bg-navy-100 dark:bg-navy-700"/>
             )}
 
             {/* Dot */}
             <div className={cn(
               "relative z-10 mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full shadow-md",
               dotClass,
-              isFirst && "ring-4 ring-white",
+              isFirst && "ring-4 ring-white dark:ring-navy-900",
             )}>
               {isFirst && (
                 <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse"/>
@@ -63,24 +63,29 @@ export function StatusTimeline({ events, type }: Props) {
                   )}>
                     {getStatusLabel(event.status)}
                   </span>
-                  <p className="mt-1 text-sm font-medium text-navy-600 leading-snug">
+                  <p className="mt-1 text-sm font-medium leading-snug
+                                text-navy-600 dark:text-white">
                     {event.description}
                   </p>
                 </div>
-                <span className="flex-shrink-0 text-xs text-navy-400 whitespace-nowrap">
+                <span className="flex-shrink-0 text-xs whitespace-nowrap
+                                 text-navy-400 dark:text-navy-400">
                   {formatDate(event.eventDate, "MMM d, HH:mm")}
                 </span>
               </div>
 
               {event.location && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-navy-400">
+                <div className="mt-1 flex items-center gap-1 text-xs
+                                text-navy-400 dark:text-navy-400">
                   <MapPin size={10}/>
                   <span>{event.location}</span>
                 </div>
               )}
 
               {isFirst && (
-                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-400">
+                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs
+                                bg-navy-50 text-navy-400
+                                dark:bg-navy-800 dark:text-navy-300">
                   <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse"/>
                   Current status
                 </div>

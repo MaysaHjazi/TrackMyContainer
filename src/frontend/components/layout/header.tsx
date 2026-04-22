@@ -17,50 +17,109 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-navy-800 bg-navy-950/90 backdrop-blur-md">
-      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="relative z-50 w-full bg-transparent">
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-7 lg:px-10">
 
-        {/* Logo */}
+        {/* Logo (same in both modes) */}
         <Link
           href="/"
           aria-label="Container Tracking — home"
-          className="flex items-center flex-shrink-0 rounded-md
+          className="group/logo flex items-center gap-2.5 flex-shrink-0 rounded-md
                      focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
         >
-          <img src="/logo-dark-final.png" alt="Container Tracking" className="h-[52px] w-auto hidden dark:block" />
-          <img src="/logo-light-final.png" alt="Container Tracking" className="h-[52px] w-auto block dark:hidden" />
+          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl
+                           bg-gradient-to-b from-orange-400 via-orange-500 to-orange-600
+                           ring-1 ring-inset ring-white/20
+                           shadow-[0_4px_12px_-2px_rgba(245,130,31,0.35)]
+                           transition-transform duration-300 group-hover/logo:scale-105">
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-xl bg-gradient-to-b from-white/25 to-transparent" />
+            <svg viewBox="0 0 24 24" className="relative h-[18px] w-[18px] text-white" fill="none" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="8" width="18" height="10" rx="1.2" stroke="currentColor" />
+              <path d="M7 8v10M12 8v10M17 8v10" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.5" />
+              <circle cx="12" cy="5" r="1.6" fill="currentColor" />
+            </svg>
+          </span>
+          {/* Wordmark — 2 lines stacked */}
+          <span className="flex flex-col leading-none select-none">
+            <span className="text-[13px] font-medium
+                             text-[#1F2937] dark:text-white/90">
+              track my
+            </span>
+            <span className="mt-[3px] text-[14px] font-bold uppercase tracking-[0.15em]
+                             text-[#FF6A00] dark:text-orange-400">
+              container
+            </span>
+          </span>
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/track"   className="text-sm font-medium text-navy-200 hover:text-orange-400 transition-colors">Track Shipment</Link>
-          <Link href="/pricing" className="text-sm font-medium text-navy-200 hover:text-orange-400 transition-colors">Pricing</Link>
-          <Link href="/about"   className="text-sm font-medium text-navy-200 hover:text-orange-400 transition-colors">About</Link>
+        <nav className="hidden items-center gap-10 md:flex">
+          {[
+            { href: "/track", label: "Track Shipment" },
+            { href: "/pricing", label: "Pricing" },
+            { href: "/about", label: "About" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group relative text-[13.5px] font-medium transition-colors duration-200
+                         text-[#6B7280] hover:text-[#1F2937]
+                         dark:font-normal dark:text-[#C8D3E0] dark:hover:text-white"
+            >
+              {item.label}
+              <span className="absolute -bottom-1 left-0 h-px w-0
+                               bg-[#FF6A00] dark:bg-gradient-to-r dark:from-orange-400 dark:to-orange-500
+                               group-hover:w-full transition-[width] duration-300 ease-out" />
+            </Link>
+          ))}
         </nav>
 
-        {/* Auth actions + theme toggle */}
+        {/* Auth actions */}
         <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle />
+          {/* ── Sign In — glass frosted, stars show through ── */}
           <Link
             href="/login"
-            className="text-sm font-medium text-navy-200 hover:text-orange-400 transition-colors"
+            className="inline-flex items-center rounded-xl px-5 py-2.5
+                       text-[13px] font-semibold transition-all duration-200
+                       backdrop-blur-md
+                       border border-[#1F2937]/12 bg-white/50 text-[#1F2937]
+                       hover:border-[#1F2937]/25 hover:bg-white/70
+                       dark:border-white/15 dark:bg-white/[0.04] dark:text-white
+                       dark:hover:border-white/30 dark:hover:bg-white/[0.08]"
           >
             Sign In
           </Link>
+          {/* ── Get Started Free — glass frosted with orange border ── */}
           <Link
             href="/register"
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white
-                       hover:bg-orange-600 transition-colors shadow-sm"
+            className="group/cta inline-flex items-center gap-2 rounded-xl px-5 py-2.5
+                       text-[13px] font-semibold transition-all duration-300 ease-out
+                       backdrop-blur-md
+                       border border-[#FF6A00] bg-white/40 text-[#FF6A00]
+                       hover:bg-[#FF6A00] hover:text-white
+                       hover:shadow-[0_8px_24px_-8px_rgba(255,106,0,0.55)]
+                       dark:border-orange-400/70 dark:bg-orange-400/[0.06] dark:text-orange-300
+                       dark:hover:border-orange-400 dark:hover:bg-orange-400/15
+                       dark:hover:text-orange-200
+                       dark:hover:shadow-[0_0_30px_-4px_rgba(251,146,60,0.35)]
+                       active:scale-[0.97]"
           >
-            Get Started Free
+            <span>Get Started Free</span>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                 className="transition-transform group-hover/cta:translate-x-0.5">
+              <path d="M1 7h12M8 2l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </Link>
         </div>
 
-        {/* Mobile: theme toggle + hamburger */}
+        {/* Mobile */}
         <div className="flex items-center gap-1 md:hidden">
           <ThemeToggle />
           <button
-            className="p-2 rounded-lg text-navy-200 hover:bg-navy-800"
+            className="p-2 rounded-lg transition-colors
+                       text-[#6B7280] hover:bg-[#F5F7FA]
+                       dark:text-[#C8D3E0] dark:hover:bg-white/5"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
           >
@@ -71,15 +130,18 @@ export function Header() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-navy-800 bg-navy-950 px-4 py-4 space-y-3 animate-fade-up">
-          <Link href="/track"    className="block text-sm font-medium text-navy-200 py-2" onClick={() => setMobileOpen(false)}>Track Shipment</Link>
-          <Link href="/pricing"  className="block text-sm font-medium text-navy-200 py-2" onClick={() => setMobileOpen(false)}>Pricing</Link>
-          <Link href="/about"    className="block text-sm font-medium text-navy-200 py-2" onClick={() => setMobileOpen(false)}>About</Link>
-          <hr className="border-navy-800"/>
-          <Link href="/login"    className="block text-sm font-medium text-navy-200 py-2" onClick={() => setMobileOpen(false)}>Sign In</Link>
+        <div className="md:hidden border-t px-5 py-4 space-y-3 animate-fade-up
+                        border-[#E5E7EB] bg-white/95
+                        dark:border-white/[0.06] dark:bg-[#030711]/90
+                        backdrop-blur-xl">
+          <Link href="/track"    className="block text-sm font-medium py-2 text-[#6B7280] dark:text-[#C8D3E0]" onClick={() => setMobileOpen(false)}>Track Shipment</Link>
+          <Link href="/pricing"  className="block text-sm font-medium py-2 text-[#6B7280] dark:text-[#C8D3E0]" onClick={() => setMobileOpen(false)}>Pricing</Link>
+          <Link href="/about"    className="block text-sm font-medium py-2 text-[#6B7280] dark:text-[#C8D3E0]" onClick={() => setMobileOpen(false)}>About</Link>
+          <hr className="border-[#E5E7EB] dark:border-white/[0.06]"/>
+          <Link href="/login"    className="block text-sm font-medium py-2 text-[#6B7280] dark:text-[#C8D3E0]" onClick={() => setMobileOpen(false)}>Sign In</Link>
           <Link
             href="/register"
-            className="block rounded-lg bg-orange-500 px-4 py-2.5 text-center text-sm font-semibold text-white"
+            className="block rounded-[10px] bg-[#FF6A00] hover:bg-[#FF7A1A] px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors"
             onClick={() => setMobileOpen(false)}
           >
             Get Started Free

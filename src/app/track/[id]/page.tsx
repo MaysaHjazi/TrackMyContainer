@@ -38,25 +38,33 @@ export default async function TrackingPage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-navy-50 to-white py-12">
+      <main className="min-h-[calc(100vh-4rem)] py-12
+                       bg-gradient-to-b from-[#F5F7FA] to-white
+                       dark:from-navy-950 dark:to-navy-950">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
 
           {/* Back link */}
           <Link
             href="/track"
-            className="mb-6 inline-flex items-center gap-1.5 text-sm text-navy-400 hover:text-orange-500 transition-colors"
+            className="mb-6 inline-flex items-center gap-1.5 text-sm transition-colors
+                       text-[#6B7280] hover:text-[#FF6A00]
+                       dark:text-navy-300 dark:hover:text-orange-400"
           >
             ← Track another shipment
           </Link>
 
           {errorMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+            <div className="rounded-2xl p-8 text-center border
+                            border-red-200 bg-red-50
+                            dark:border-red-500/25 dark:bg-red-500/10">
               <div className="mb-3 text-4xl">📦</div>
-              <h2 className="text-lg font-bold text-navy-600">Tracking Not Found</h2>
-              <p className="mt-2 text-sm text-navy-400">{errorMessage}</p>
+              <h2 className="text-lg font-bold text-[#1F2937] dark:text-white">Tracking Not Found</h2>
+              <p className="mt-2 text-sm text-[#6B7280] dark:text-navy-300">{errorMessage}</p>
               <Link
                 href="/track"
-                className="mt-6 inline-block rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600"
+                className="mt-6 inline-block rounded-xl px-6 py-2.5 text-sm font-bold text-white
+                           bg-[#FF6A00] hover:bg-[#FF7A1A]
+                           dark:bg-orange-500 dark:hover:bg-orange-600"
               >
                 Try Again
               </Link>

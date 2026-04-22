@@ -1,24 +1,32 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls, Sphere, Line, Float, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { TextureLoader } from "three";
+import { useTheme } from "@/frontend/theme-provider";
 
 /* ══════════════════════════════════════════════════════════════
    DATA
    ══════════════════════════════════════════════════════════════ */
 
-const ROUTES: { from: [number, number]; to: [number, number]; color: string }[] = [
-  { from: [121.5, 31.2], to: [4.5, 51.9], color: "#00B4C4" },
-  { from: [103.8, 1.3], to: [55.3, 25.3], color: "#00B4C4" },
-  { from: [129.0, 35.1], to: [-118.2, 33.9], color: "#00B4C4" },
-  { from: [55.3, 25.3], to: [-0.1, 51.5], color: "#F5821F" },
-  { from: [8.6, 50.0], to: [121.5, 31.2], color: "#F5821F" },
-  { from: [4.5, 51.9], to: [-74.0, 40.7], color: "#00B4C4" },
-  { from: [51.5, 25.3], to: [151.2, -33.9], color: "#F5821F" },
-  { from: [121.5, 31.2], to: [-46.3, -23.9], color: "#00B4C4" },
+/* Theme-aware color palettes */
+const PALETTE = {
+  light: { sea: "#3B82F6", air: "#FF6A00", pin: "#FF6A00", dot: "#3B82F6" },
+  dark:  { sea: "#00B4C4", air: "#F5821F", pin: "#F5821F", dot: "#00B4C4" },
+} as const;
+
+/* Route topology — `kind` stays stable; color is resolved per theme */
+const ROUTE_DEFS: { from: [number, number]; to: [number, number]; kind: "sea" | "air" }[] = [
+  { from: [121.5, 31.2], to: [4.5, 51.9],   kind: "sea" },
+  { from: [103.8, 1.3],  to: [55.3, 25.3],  kind: "sea" },
+  { from: [129.0, 35.1], to: [-118.2, 33.9],kind: "sea" },
+  { from: [55.3, 25.3],  to: [-0.1, 51.5],  kind: "air" },
+  { from: [8.6, 50.0],   to: [121.5, 31.2], kind: "air" },
+  { from: [4.5, 51.9],   to: [-74.0, 40.7], kind: "sea" },
+  { from: [51.5, 25.3],  to: [151.2, -33.9],kind: "air" },
+  { from: [121.5, 31.2], to: [-46.3, -23.9],kind: "sea" },
 ];
 
 const PORTS: [number, number][] = [
@@ -56,7 +64,7 @@ function createArc(from: [number, number], to: [number, number], radius: number)
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Location Pin (orange marker) ── */
-function LocationPin({ position, delay }: { position: THREE.Vector3; delay: number }) {
+function LocationPin({ position, delay, color }: { position: THREE.Vector3; delay: number; color: string }) {
   const pinRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
 
@@ -74,27 +82,24 @@ function LocationPin({ position, delay }: { position: THREE.Vector3; delay: numb
 
   return (
     <group ref={pinRef} position={pinPos}>
-      {/* Pin head */}
       <mesh>
         <sphereGeometry args={[0.025, 10, 10]} />
-        <meshBasicMaterial color="#F5821F" />
+        <meshBasicMaterial color={color} />
       </mesh>
-      {/* Pin glow */}
       <mesh>
         <sphereGeometry args={[0.045, 10, 10]} />
-        <meshBasicMaterial color="#F5821F" transparent opacity={0.2} />
+        <meshBasicMaterial color={color} transparent opacity={0.25} />
       </mesh>
-      {/* Pulsing ring */}
       <mesh ref={ringRef}>
         <ringGeometry args={[0.02, 0.035, 16]} />
-        <meshBasicMaterial color="#F5821F" transparent opacity={0.7} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={color} transparent opacity={0.7} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
 }
 
-/* ── Teal port dot with pulse ── */
-function PortDot({ position, delay }: { position: THREE.Vector3; delay: number }) {
+/* ── Port dot with pulse ── */
+function PortDot({ position, delay, color }: { position: THREE.Vector3; delay: number; color: string }) {
   const ringRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
@@ -109,15 +114,15 @@ function PortDot({ position, delay }: { position: THREE.Vector3; delay: number }
     <group position={position}>
       <mesh>
         <sphereGeometry args={[0.018, 10, 10]} />
-        <meshBasicMaterial color="#00B4C4" />
+        <meshBasicMaterial color={color} />
       </mesh>
       <mesh>
         <sphereGeometry args={[0.035, 10, 10]} />
-        <meshBasicMaterial color="#00B4C4" transparent opacity={0.15} />
+        <meshBasicMaterial color={color} transparent opacity={0.2} />
       </mesh>
       <mesh ref={ringRef}>
         <ringGeometry args={[0.015, 0.025, 16]} />
-        <meshBasicMaterial color="#00B4C4" transparent opacity={0.5} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={color} transparent opacity={0.55} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -332,66 +337,122 @@ function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 
   );
 }
 
-/* ── Globe with Earth texture ── */
-function GlobeMesh() {
+/* ── Globe with Earth texture — theme-aware (day or night) ── */
+function GlobeMesh({ isDark }: { isDark: boolean }) {
   const globeRef = useRef<THREE.Group>(null);
-  const texture = useLoader(TextureLoader, "/textures/earth-night.jpg");
+  const cloudsRef = useRef<THREE.Mesh>(null);
+  const palette = isDark ? PALETTE.dark : PALETTE.light;
+  // Preload ALL textures so theme swap is instant; show current-mode one.
+  const dayTex    = useLoader(TextureLoader, "/textures/earth-day.jpg");
+  const nightTex  = useLoader(TextureLoader, "/textures/earth-night.jpg");
+  const cloudsTex = useLoader(TextureLoader, "/textures/earth-clouds.png");
 
   useFrame(({ clock }) => {
-    if (globeRef.current) {
-      globeRef.current.rotation.y = clock.getElapsedTime() * 0.04;
-    }
+    const t = clock.getElapsedTime();
+    if (globeRef.current)  globeRef.current.rotation.y  = t * 0.04;
+    // Clouds drift slightly faster than the globe for depth
+    if (cloudsRef.current) cloudsRef.current.rotation.y = t * 0.055;
   });
 
   return (
     <group ref={globeRef}>
-      {/* Earth sphere with night lights texture */}
-      <Sphere args={[1.5, 64, 64]}>
-        <meshStandardMaterial
-          map={texture}
-          emissiveMap={texture}
-          emissive={new THREE.Color("#ffffff")}
-          emissiveIntensity={1.2}
-          roughness={0.9}
-          metalness={0.1}
+      {/* ── Atmosphere: outer soft glow ── */}
+      <Sphere args={[1.68, 48, 48]}>
+        <meshBasicMaterial
+          color={isDark ? "#1B3A6E" : "#7FB6FF"}
+          transparent
+          opacity={isDark ? 0.05 : 0.12}
+          side={THREE.BackSide}
+        />
+      </Sphere>
+      {/* Inner atmosphere ring */}
+      <Sphere args={[1.56, 48, 48]}>
+        <meshBasicMaterial
+          color={isDark ? "#2B5EA0" : "#B8D9FF"}
+          transparent
+          opacity={isDark ? 0.08 : 0.22}
+          side={THREE.BackSide}
         />
       </Sphere>
 
+      {isDark ? (
+        /* ── DARK MODE — night texture with city lights ── */
+        <Sphere args={[1.5, 64, 64]}>
+          <meshStandardMaterial
+            map={nightTex}
+            emissiveMap={nightTex}
+            emissive={new THREE.Color("#ffffff")}
+            emissiveIntensity={1.2}
+            roughness={0.9}
+            metalness={0.1}
+          />
+        </Sphere>
+      ) : (
+        <>
+          {/* ── LIGHT MODE — realistic day earth ── */}
+          <Sphere args={[1.5, 96, 96]}>
+            <meshStandardMaterial
+              map={dayTex}
+              roughness={0.6}
+              metalness={0.08}
+              emissive={new THREE.Color("#FFEED0")}
+              emissiveIntensity={0.03}
+            />
+          </Sphere>
 
-      {/* Port dots (teal) — half the ports */}
+          {/* ── Cloud layer — slightly larger sphere, semi-transparent ── */}
+          <mesh ref={cloudsRef}>
+            <sphereGeometry args={[1.515, 96, 96]} />
+            <meshStandardMaterial
+              map={cloudsTex}
+              transparent
+              opacity={0.42}
+              depthWrite={false}
+              roughness={1}
+              metalness={0}
+              emissive={new THREE.Color("#FFFFFF")}
+              emissiveIntensity={0.04}
+            />
+          </mesh>
+        </>
+      )}
+
+
+      {/* Port dots (sea blue) — half the ports */}
       {PORTS.slice(0, 6).map((port, i) => {
         const pos = latLngToVector3(port[0], port[1], 1.53);
-        return <PortDot key={`port-${i}`} position={pos} delay={i * 0.5} />;
+        return <PortDot key={`port-${i}`} position={pos} delay={i * 0.5} color={palette.dot} />;
       })}
 
       {/* Location pins (orange) — other half */}
       {PORTS.slice(6).map((port, i) => {
         const pos = latLngToVector3(port[0], port[1], 1.53);
-        return <LocationPin key={`pin-${i}`} position={pos} delay={i * 0.7} />;
+        return <LocationPin key={`pin-${i}`} position={pos} delay={i * 0.7} color={palette.pin} />;
       })}
 
-      {/* Route arcs — glowing */}
-      {ROUTES.map((route, i) => {
+      {/* Route arcs — theme-aware color + opacity */}
+      {ROUTE_DEFS.map((route, i) => {
         const points = createArc(route.from, route.to, 1.5);
+        const color = route.kind === "sea" ? palette.sea : palette.air;
         return (
           <Line
             key={i}
             points={points}
-            color={route.color}
-            lineWidth={1.5}
+            color={color}
+            lineWidth={1.8}
             transparent
-            opacity={0.45}
+            opacity={isDark ? 0.5 : 0.72}
           />
         );
       })}
 
       {/* Traveling dots */}
-      {ROUTES.map((route, i) => (
+      {ROUTE_DEFS.map((route, i) => (
         <TravelingDot
           key={`dot-${i}`}
           from={route.from}
           to={route.to}
-          color={route.color}
+          color={route.kind === "sea" ? palette.sea : palette.air}
           speed={0.06 + i * 0.012}
           radius={1.5}
         />
@@ -401,7 +462,7 @@ function GlobeMesh() {
 }
 
 /* ── Floating particles (stars) ── */
-function Particles({ count = 350 }: { count?: number }) {
+function Particles({ count = 350, isDark = false }: { count?: number; isDark?: boolean }) {
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
@@ -418,7 +479,13 @@ function Particles({ count = 350 }: { count?: number }) {
         {/* @ts-expect-error – @react-three/fiber bufferAttribute args vs props mismatch */}
         <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial size={0.015} color="#4B6EC4" transparent opacity={0.6} sizeAttenuation />
+      <pointsMaterial
+        size={isDark ? 0.015 : 0.010}
+        color={isDark ? "#4B6EC4" : "#D4DCE6"}
+        transparent
+        opacity={isDark ? 0.6 : 0.25}
+        sizeAttenuation
+      />
     </points>
   );
 }
@@ -428,22 +495,61 @@ function Particles({ count = 350 }: { count?: number }) {
    ══════════════════════════════════════════════════════════════ */
 
 export function HeroGlobe() {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Render dark theme on SSR to avoid flash; refine on client
+  const isDark = mounted ? theme === "dark" : false;
+
   return (
-    <div className="w-full h-full min-h-[400px]">
+    <div
+      className="w-full h-full min-h-[400px] motion-safe:transition-[opacity,transform] ease-out"
+      style={{
+        opacity: ready ? 1 : 0,
+        transform: ready ? "scale(1)" : "scale(0.94)",
+        transitionDuration: "1200ms",
+      }}
+    >
       <Canvas
-        camera={{ position: [0, 0.2, 5.5], fov: 40 }}
+        camera={{ position: [0, 0.2, 6.3], fov: 38 }}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}
         style={{ background: "transparent" }}
+        onCreated={() => {
+          // Globe geometry is up — ease it in once the first frame renders
+          requestAnimationFrame(() => setReady(true));
+        }}
       >
-        <ambientLight intensity={0.2} />
-        <directionalLight position={[5, 3, 5]} intensity={0.8} color="#E8ECF2" />
-        <directionalLight position={[0, 2, 4]} intensity={0.5} color="#ffffff" />
-        <pointLight position={[-4, -2, -4]} intensity={0.3} color="#00B4C4" />
-        <pointLight position={[3, 4, -2]} intensity={0.2} color="#F5821F" />
+        {/* Lighting rig — bright for light mode, soft for dark mode */}
+        {isDark ? (
+          <>
+            <ambientLight intensity={0.2} />
+            <directionalLight position={[5, 3, 5]} intensity={0.8} color="#E8ECF2" />
+            <directionalLight position={[0, 2, 4]} intensity={0.5} color="#ffffff" />
+            <pointLight position={[-4, -2, -4]} intensity={0.3} color="#00B4C4" />
+            <pointLight position={[3, 4, -2]} intensity={0.2} color="#F5821F" />
+          </>
+        ) : (
+          <>
+            {/* Cinematic light-mode rig — bright sun from upper-right, soft fill,
+                ocean-blue rim, warm sunset accent on the opposite side */}
+            <ambientLight intensity={0.55} />
+            {/* Key light — sun */}
+            <directionalLight position={[5, 4, 5]} intensity={1.8} color="#FFF4DB" />
+            {/* Fill — cool sky */}
+            <directionalLight position={[-4, 1, 3]} intensity={0.5} color="#DCE9FF" />
+            {/* Rim — ocean reflection */}
+            <pointLight position={[-4, -2, -4]} intensity={0.45} color="#4FA3FF" />
+            {/* Sunset accent on back */}
+            <pointLight position={[3, 2, -5]}  intensity={0.35} color="#FFB070" />
+            {/* Soft under-light to lift shadows */}
+            <pointLight position={[0, -4, 2]} intensity={0.18} color="#FFFFFF" />
+          </>
+        )}
 
         <Float speed={0.6} rotationIntensity={0.08} floatIntensity={0.2}>
-          <GlobeMesh />
+          <GlobeMesh isDark={isDark} />
         </Float>
 
         {/* ── 3D Containers floating around globe ── */}
@@ -480,7 +586,7 @@ export function HeroGlobe() {
           />
         </Float>
 
-        <Particles />
+        <Particles isDark={isDark} />
 
         <OrbitControls
           enableZoom={false}

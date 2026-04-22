@@ -75,8 +75,12 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans:  ["Inter", "system-ui", "sans-serif"],
-        mono:  ["JetBrains Mono", "Fira Code", "monospace"],
+        /* Plus Jakarta Sans — friendly geometric sans with rounded terminals,
+           high legibility, warm feel. Perfect for consumer SaaS. */
+        sans:    ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
+        mono:    ["JetBrains Mono", "Fira Code", "monospace"],
+        serif:   ["Instrument Serif", "Georgia", "serif"],
+        display: ["Instrument Serif", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -109,6 +113,7 @@ const config: Config = {
         "float-slow":   { "0%, 100%": { transform: "translateY(0px)" }, "50%": { transform: "translateY(-8px)" } },
         "float-medium": { "0%, 100%": { transform: "translateY(0px)" }, "50%": { transform: "translateY(-5px)" } },
         "float-fast":   { "0%, 100%": { transform: "translateY(0px)" }, "50%": { transform: "translateY(-10px)" } },
+        "star-twinkle": { "0%, 100%": { opacity: "1" }, "50%": { opacity: "0.65" } },
       },
       animation: {
         "pulse-dot":    "pulse-dot 2s ease-in-out infinite",
@@ -118,6 +123,7 @@ const config: Config = {
         "float-slow":   "float-slow 4s ease-in-out infinite",
         "float-medium": "float-medium 3s ease-in-out infinite",
         "float-fast":   "float-fast 5s ease-in-out infinite",
+        "star-twinkle": "star-twinkle 4.5s ease-in-out infinite",
       },
     },
   },

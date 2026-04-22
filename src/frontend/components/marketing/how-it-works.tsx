@@ -35,14 +35,18 @@ const CARRIERS = [
 
 export function HowItWorks() {
   return (
-    <section className="relative py-24 bg-navy-950 overflow-hidden">
+    <section className="relative py-24 overflow-hidden
+                        bg-[#EEF2F6] dark:bg-navy-950">
       {/* top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-navy-700 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r
+                      from-transparent via-[#E5E7EB] to-transparent
+                      dark:via-navy-700" />
 
       {/* subtle bg glow */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full blur-[160px] opacity-[0.04]"
-          style={{ background: "radial-gradient(ellipse, #F5821F 0%, transparent 70%)" }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full blur-[160px]
+                        opacity-[0.10] dark:opacity-[0.04]"
+          style={{ background: "radial-gradient(ellipse, #FF6A00 0%, transparent 70%)" }} />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -54,12 +58,17 @@ export function HowItWorks() {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-16"
         >
-          <span className="inline-block mb-4 rounded-full border border-navy-700 bg-navy-900 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-teal-400">
+          <span className="inline-block mb-4 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-widest
+                           border border-[#E5E7EB] bg-white text-[#FF6A00] shadow-[0_2px_8px_rgba(0,0,0,0.04)]
+                           dark:border-navy-700 dark:bg-navy-900 dark:text-teal-400 dark:shadow-none">
             How it works
           </span>
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
+          <h2 className="text-3xl font-extrabold sm:text-4xl
+                         text-[#1F2937] dark:text-white">
             Tracking in{" "}
-            <span className="bg-gradient-to-r from-orange-400 to-teal-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r bg-clip-text text-transparent
+                             from-[#FF6A00] to-[#3B82F6]
+                             dark:from-orange-400 dark:to-teal-400">
               3 simple steps
             </span>
           </h2>
@@ -68,7 +77,9 @@ export function HowItWorks() {
         {/* steps */}
         <div className="relative grid gap-8 md:grid-cols-3">
           {/* connector lines */}
-          <div className="absolute top-10 left-[33%] right-[33%] h-px bg-gradient-to-r from-orange-500/30 via-teal-500/30 to-orange-500/30 hidden md:block" />
+          <div className="absolute top-10 left-[33%] right-[33%] h-px hidden md:block
+                          bg-gradient-to-r from-[#FF6A00]/30 via-[#3B82F6]/30 to-[#FF6A00]/30
+                          dark:from-orange-500/30 dark:via-teal-500/30 dark:to-orange-500/30" />
 
           {STEPS.map(({ icon: Icon, number, title, description, color }, i) => (
             <motion.div
@@ -80,20 +91,27 @@ export function HowItWorks() {
               className="relative flex flex-col items-center text-center"
             >
               {/* icon circle */}
-              <div className={`relative mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2
-                ${color === "orange"
-                  ? "border-orange-500/30 bg-orange-500/10 shadow-[0_0_30px_rgba(245,130,31,0.12)]"
-                  : "border-teal-500/30 bg-teal-500/10 shadow-[0_0_30px_rgba(0,180,196,0.12)]"
-                }`}>
-                <Icon size={28} className={color === "orange" ? "text-orange-400" : "text-teal-400"} />
+              <div className={`relative mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 ${
+                color === "orange"
+                  ? "border-[#FF6A00]/30 bg-[#FFF4EC] shadow-[0_8px_24px_rgba(255,106,0,0.12)] dark:border-orange-500/30 dark:bg-orange-500/10 dark:shadow-[0_0_30px_rgba(245,130,31,0.12)]"
+                  : "border-[#3B82F6]/30 bg-[#EEF5FF] shadow-[0_8px_24px_rgba(59,130,246,0.12)] dark:border-teal-500/30 dark:bg-teal-500/10 dark:shadow-[0_0_30px_rgba(0,180,196,0.12)]"
+              }`}>
+                <Icon size={28} className={
+                  color === "orange"
+                    ? "text-[#FF6A00] dark:text-orange-400"
+                    : "text-[#3B82F6] dark:text-teal-400"
+                } />
                 {/* step number */}
-                <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-navy-800 border border-navy-600 text-[10px] font-bold text-navy-300">
+                <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold
+                                 border bg-white border-[#E5E7EB] text-[#6B7280]
+                                 dark:bg-navy-800 dark:border-navy-600 dark:text-navy-300">
                   {number}
                 </span>
               </div>
 
-              <h3 className="mb-3 text-lg font-bold text-white">{title}</h3>
-              <p className="text-sm leading-relaxed text-navy-400 max-w-xs mx-auto">{description}</p>
+              <h3 className="mb-3 text-lg font-bold text-[#1F2937] dark:text-white">{title}</h3>
+              <p className="text-sm leading-relaxed max-w-xs mx-auto
+                            text-[#6B7280] dark:text-navy-400">{description}</p>
             </motion.div>
           ))}
         </div>
@@ -106,18 +124,25 @@ export function HowItWorks() {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
           className="mt-20"
         >
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-navy-600 mb-6">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-6
+                        text-[#9CA3AF] dark:text-navy-600">
             Supported carriers &amp; airlines
           </p>
           <div className="relative overflow-hidden">
             {/* fade edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-navy-950 to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-navy-950 to-transparent z-10 pointer-events-none" />
+            <div className="absolute left-0 top-0 bottom-0 w-16 z-10 pointer-events-none
+                            bg-gradient-to-r from-[#EEF2F6] to-transparent
+                            dark:from-navy-950 dark:to-transparent" />
+            <div className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none
+                            bg-gradient-to-l from-[#EEF2F6] to-transparent
+                            dark:from-navy-950 dark:to-transparent" />
             <div className="flex animate-marquee gap-6 whitespace-nowrap">
               {[...CARRIERS, ...CARRIERS].map((c, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center rounded-lg border border-navy-800 bg-navy-900/60 px-4 py-2 text-xs font-semibold text-navy-400 hover:text-white hover:border-navy-700 transition-colors flex-shrink-0"
+                  className="inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold transition-colors flex-shrink-0
+                             border bg-white border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937] hover:border-[#D1D5DB]
+                             dark:border-navy-800 dark:bg-navy-900/60 dark:text-navy-400 dark:hover:text-white dark:hover:border-navy-700"
                 >
                   {c}
                 </span>
