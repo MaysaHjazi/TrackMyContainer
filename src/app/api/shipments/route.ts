@@ -110,8 +110,13 @@ export async function POST(req: NextRequest) {
       destination: trackingData.destination,
       currentStatus: trackingData.currentStatus,
       currentLocation: trackingData.currentLocation,
-      etaDate: trackingData.etaDate,
+      // If the shipment was already arrived on first add, the carrier's
+      // ETA field has been overwritten with the actual arrival date —
+      // skip saving it so we don't show a redundant (ETA == ATA) value.
+      etaDate: trackingData.ataDate ? null : trackingData.etaDate,
       etdDate: trackingData.etdDate,
+      atdDate: trackingData.atdDate,
+      ataDate: trackingData.ataDate,
       vesselName: trackingData.vesselName,
       voyageNumber: trackingData.voyageNumber,
       flightNumber: trackingData.flightNumber,

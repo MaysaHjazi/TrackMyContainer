@@ -189,7 +189,13 @@ export class JsonCargoProvider implements TrackingProvider {
     // Every event below corresponds to an explicit JSONCargo-provided
     // timestamp. We do NOT invent intermediate events — the MARINER plan
     // only surfaces a summary view, so we honor what's given.
+    //
+    // PAST-ONLY RULE: events only appear in the timeline once they have
+    // actually happened. Future ETAs/ETDs are surfaced on the shipment
+    // record as `etaDate` / `etdDate`, never as tracking events.
     const events: ProviderEvent[] = [];
+    const now = new Date();
+    const isPast = (d: Date | null): d is Date => d !== null && d.getTime() <= now.getTime();
 
     // The key fact for status: is the container at its final destination?
     const isAtDestination = !!(d.last_location && d.shipped_to &&
@@ -202,7 +208,7 @@ export class JsonCargoProvider implements TrackingProvider {
 
     // ── Event 1: departure from origin (atd_origin) ──────────────
     const departureTime = parseJCDate(d.atd_origin);
-    if (departureTime && d.shipped_from) {
+    if (isPast(departureTime) && d.shipped_from) {
       events.push({
         rawStatus:   "Departed",
         location:    d.shipped_from,
@@ -211,11 +217,34 @@ export class JsonCargoProvider implements TrackingProvider {
       });
     }
 
-    // ── Event 2: latest observation (timestamp_of_last_location) ──
+    // ── Event 2: intermediate transshipment leg (atd_last_location) ──
+    // When the container left a mid-route transshipment port bound for the
+    // current `last_location`. JSONCargo doesn't name the previous port,
+    // so we describe the leg by where it's heading. Skipped if the date
+    // duplicates the origin departure or is in the future.
+    const transitDeparture = parseJCDate(d.atd_last_location);
+    if (
+      isPast(transitDeparture) &&
+      d.last_location &&
+      (!departureTime || transitDeparture.getTime() !== departureTime.getTime())
+    ) {
+      const legVessel    = d.last_vessel_name;
+      const vesselSuffix = legVessel
+        ? ` on ${legVessel}${d.last_voyage_number ? ` (${d.last_voyage_number})` : ""}`
+        : "";
+      events.push({
+        rawStatus:   "In Transit",
+        location:    d.last_location,
+        description: `In transit bound for ${d.last_location}${vesselSuffix}`,
+        timestamp:   transitDeparture,
+      });
+    }
+
+    // ── Event 3: latest observation (timestamp_of_last_location) ──
     const lastMovement = parseJCDate(
       d.timestamp_of_last_location ?? d.last_movement_timestamp ?? d.last_updated,
     );
-    if (lastMovement && d.last_location) {
+    if (isPast(lastMovement) && d.last_location) {
       // Decide status from LOCATION vs DESTINATION, not from the ambiguous
       // container_status string. "Discharge" at a transit port means
       // transshipment; the SAME word at the destination means arrival.
@@ -266,9 +295,20 @@ export class JsonCargoProvider implements TrackingProvider {
       return this.failure(trackingNumber, "No movement data available yet");
     }
 
-    // ── ETA / ETD ──────────────────────────────────────────────
-    const eta = parseJCDate(d.eta_final_destination);
-    const etd = parseJCDate(d.atd_origin);
+    // ── Date mapping: estimated vs actual ────────────────────────
+    // JSONCargo's `atd_origin` is the **ACTUAL** time of departure from
+    // origin (already-happened event), so it maps to `atd`, NOT `etd`.
+    // JSONCargo doesn't provide a separate estimated-departure field.
+    //
+    // `eta_final_destination` is always the carrier's published estimate
+    // and we keep it regardless of arrival state — so the user can compare
+    // "estimated vs actual" once ATA lands.
+    //
+    // ATA is only populated once the container's `last_location` matches
+    // `shipped_to` — i.e. it has actually arrived at the final destination.
+    const atd = parseJCDate(d.atd_origin) ?? undefined;
+    const eta = parseJCDate(d.eta_final_destination) ?? undefined;
+    const ata = isAtDestination && isPast(lastMovement) ? lastMovement : undefined;
 
     return {
       success:        true,
@@ -276,8 +316,9 @@ export class JsonCargoProvider implements TrackingProvider {
       trackingNumber,
       carrier:        d.shipping_line_name,
       events,
-      eta:            eta ?? undefined,
-      etd:            etd ?? undefined,
+      eta,
+      atd:            atd ?? undefined,
+      ata,
       origin:         d.shipped_from ?? d.loading_port,
       destination:    d.shipped_to   ?? d.discharging_port,
       vessel:         d.current_vessel_name ?? d.last_vessel_name,

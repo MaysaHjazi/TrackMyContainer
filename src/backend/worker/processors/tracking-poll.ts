@@ -58,13 +58,29 @@ export async function trackingPollProcessor(
     });
   }
 
+  // ── ETA "freeze on arrival" rule ──────────────────────────────
+  // Carriers like JSONCargo overwrite `eta_final_destination` with the
+  // actual arrival date once a container arrives, which would destroy the
+  // original estimate. To let users compare estimated-vs-actual, we lock
+  // the saved ETA once ATA lands: no further ETA writes after arrival.
+  const newlyArrived   = !shipment.ataDate && !!result.ataDate;
+  const alreadyArrived = !!shipment.ataDate;
+  const etaUpdate = alreadyArrived
+    ? {}                                             // freeze — don't touch etaDate
+    : newlyArrived
+      ? { etaDate: shipment.etaDate }                // keep prior estimate (null if none — avoids ETA==ATA)
+      : { etaDate: result.etaDate ?? null };         // in transit — refresh estimate
+
   // ── Update shipment record ────────────────────────────────────
   await prisma.shipment.update({
     where: { id: shipmentId },
     data: {
       currentStatus:   result.currentStatus,
       currentLocation: result.currentLocation,
-      etaDate:         result.etaDate,
+      ...etaUpdate,
+      etdDate:         result.etdDate ?? null,
+      atdDate:         result.atdDate ?? null,
+      ataDate:         result.ataDate ?? null,
       vesselName:      result.vesselName,
       voyageNumber:    result.voyageNumber,
       flightNumber:    result.flightNumber,

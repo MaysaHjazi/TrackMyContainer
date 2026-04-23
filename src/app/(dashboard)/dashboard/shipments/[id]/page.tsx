@@ -29,6 +29,8 @@ import {
 } from "@/lib/utils";
 import type { ShipmentStatus } from "@prisma/client";
 import { ShipmentActions } from "./shipment-actions";
+import { RouteMap } from "@/frontend/components/dashboard/route-map";
+import { RouteVisualization } from "@/frontend/components/dashboard/route-visualization";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -254,81 +256,63 @@ export default async function ShipmentDetailPage({
           </div>
         </div>
 
-        {/* ── Route Card ──────────────────────────────────────── */}
-        <div className="rounded-xl border border-navy-200 bg-white p-6 shadow-sm dark:border-navy-800 dark:bg-navy-900">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-navy-400 dark:text-navy-500">
-            Route
-          </h3>
-          <div className="flex items-center gap-4">
-            <div className="flex-1 text-center">
-              <div className="flex items-center justify-center gap-1.5">
-                <MapPin size={14} className="text-teal-500" />
-                <span className="text-xs font-bold uppercase text-navy-400 dark:text-navy-500">
-                  Origin
-                </span>
-              </div>
-              <p className="mt-1 text-lg font-bold text-navy-900 dark:text-white">
-                {shipment.origin ?? "—"}
-              </p>
-              {shipment.originCode && (
-                <p className="text-xs text-navy-400 dark:text-navy-500">{shipment.originCode}</p>
-              )}
-            </div>
-
-            <div className="flex flex-col items-center gap-1">
-              <div className="h-px w-16 bg-navy-200 dark:bg-navy-700" />
-              <TypeIcon size={16} className={cn("flex-shrink-0", typeColorClass)} />
-              <div className="h-px w-16 bg-navy-200 dark:bg-navy-700" />
-            </div>
-
-            <div className="flex-1 text-center">
-              <div className="flex items-center justify-center gap-1.5">
-                <MapPin size={14} className="text-orange-500" />
-                <span className="text-xs font-bold uppercase text-navy-400 dark:text-navy-500">
-                  Destination
-                </span>
-              </div>
-              <p className="mt-1 text-lg font-bold text-navy-900 dark:text-white">
-                {shipment.destination ?? "—"}
-              </p>
-              {shipment.destinationCode && (
-                <p className="text-xs text-navy-400 dark:text-navy-500">
-                  {shipment.destinationCode}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* ── Cinematic Route Visualization ─────────────────────── */}
+        <RouteVisualization
+          origin={shipment.origin}
+          destination={shipment.destination}
+          type={shipment.type}
+          currentStatus={shipment.currentStatus}
+          atdDate={shipment.atdDate}
+          etaDate={shipment.etaDate}
+          ataDate={shipment.ataDate}
+        />
 
         {/* ── Dates Card ──────────────────────────────────────── */}
-        <div className="rounded-xl border border-navy-200 bg-white p-6 shadow-sm dark:border-navy-800 dark:bg-navy-900">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-navy-400 dark:text-navy-500">
-            Key Dates
-          </h3>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {[
-              { label: "ETD", date: shipment.etdDate, icon: Calendar },
-              { label: "ATD", date: shipment.atdDate, icon: Calendar },
-              { label: "ETA", date: shipment.etaDate, icon: Clock },
-              { label: "ATA", date: shipment.ataDate, icon: CheckCircle2 },
-            ].map(({ label, date, icon: Icon }) => (
-              <div
-                key={label}
-                className="rounded-lg border border-navy-100 bg-navy-50/50 p-3 dark:border-navy-800 dark:bg-navy-800/50"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Icon size={12} className="text-navy-400 dark:text-navy-500" />
-                  <span className="text-xs font-bold uppercase text-navy-400 dark:text-navy-500">
-                    {label}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm font-semibold text-navy-900 dark:text-white">
-                  {date ? formatDate(date) : "—"}
-                </p>
+        {/* Only render cards for dates we actually have — carriers like
+            JSONCargo don't provide ETD, so showing an empty "ETD: —" just
+            confuses the user. Hide missing fields; keep the meaningful ones. */}
+        {(() => {
+          const dateFields = [
+            { label: "ETD", date: shipment.etdDate, icon: Calendar },
+            { label: "ATD", date: shipment.atdDate, icon: Calendar },
+            { label: "ETA", date: shipment.etaDate, icon: Clock },
+            { label: "ATA", date: shipment.ataDate, icon: CheckCircle2 },
+          ].filter((f) => f.date);
+
+          if (dateFields.length === 0) return null;
+
+          return (
+            <div className="rounded-xl border border-navy-200 bg-white p-6 shadow-sm dark:border-navy-800 dark:bg-navy-900">
+              <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-navy-400 dark:text-navy-500">
+                Key Dates
+              </h3>
+              <div className={cn(
+                "grid gap-4",
+                dateFields.length === 1 && "grid-cols-1",
+                dateFields.length === 2 && "grid-cols-2",
+                dateFields.length === 3 && "grid-cols-3",
+                dateFields.length === 4 && "grid-cols-2 sm:grid-cols-4",
+              )}>
+                {dateFields.map(({ label, date, icon: Icon }) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border border-navy-100 bg-navy-50/50 p-3 dark:border-navy-800 dark:bg-navy-800/50"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Icon size={12} className="text-navy-400 dark:text-navy-500" />
+                      <span className="text-xs font-bold uppercase text-navy-400 dark:text-navy-500">
+                        {label}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-navy-900 dark:text-white">
+                      {formatDate(date!)}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })()}
 
         {/* ── Tracking Events Timeline ────────────────────────── */}
         <div className="rounded-xl border border-navy-200 bg-white p-6 shadow-sm dark:border-navy-800 dark:bg-navy-900">
@@ -433,18 +417,12 @@ export default async function ShipmentDetailPage({
             </div>
           )}
 
-          {/* Route map placeholder */}
-          <div className="rounded-xl border border-navy-200 bg-navy-50 p-4 dark:border-navy-800 dark:bg-navy-800">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-navy-400 dark:text-navy-500 mb-3">
-              Route Map
-            </h4>
-            <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-navy-300 bg-white dark:border-navy-700 dark:bg-navy-900">
-              <div className="text-center">
-                <Navigation size={24} className="mx-auto text-navy-300 dark:text-navy-600" />
-                <p className="mt-1 text-xs text-navy-400 dark:text-navy-500">Map coming soon</p>
-              </div>
-            </div>
-          </div>
+          {/* Route map */}
+          <RouteMap
+            origin={shipment.origin}
+            destination={shipment.destination}
+            currentLocation={shipment.currentLocation}
+          />
 
           {/* Shipment details */}
           <div className="space-y-2 text-xs">

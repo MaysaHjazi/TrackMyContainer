@@ -9,14 +9,20 @@ export interface TrackingProvider {
 }
 
 // ── Raw provider response (before normalization) ──────────────
+// eta/etd are estimates — populated before the event happens.
+// ata/atd are actuals  — populated once the event has happened.
+// A given shipment typically has either ETD or ATD (not both), depending
+// on whether it has departed. Same for ETA/ATA.
 export interface ProviderResult {
   success:   boolean;
   provider:  string;
   trackingNumber: string;
   carrier?:  string;
   events:    ProviderEvent[];
-  eta?:      Date;
-  etd?:      Date;
+  eta?:      Date;   // estimated arrival
+  etd?:      Date;   // estimated departure
+  ata?:      Date;   // actual arrival
+  atd?:      Date;   // actual departure
   origin?:   string;
   destination?: string;
   vessel?:   string;
@@ -43,9 +49,10 @@ export interface TrackingResult {
   currentLocation?: string;
   origin?:       string;
   destination?:  string;
-  etaDate?:      Date;
-  etdDate?:      Date;
-  ataDate?:      Date;
+  etaDate?:      Date;   // estimated arrival
+  etdDate?:      Date;   // estimated departure
+  ataDate?:      Date;   // actual arrival
+  atdDate?:      Date;   // actual departure
   vesselName?:   string;
   voyageNumber?: string;
   flightNumber?: string;

@@ -114,6 +114,8 @@ export async function trackShipment(
           destination:     result.destination,
           etaDate:         result.eta,
           etdDate:         result.etd,
+          atdDate:         result.atd,
+          ataDate:         result.ata,
           vesselName:      result.vessel,
           voyageNumber:    result.voyage,
           flightNumber:    result.flight,
