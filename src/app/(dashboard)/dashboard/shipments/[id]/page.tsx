@@ -31,7 +31,7 @@ import type { ShipmentStatus } from "@prisma/client";
 import { ShipmentActions } from "./shipment-actions";
 import { RouteMap } from "@/frontend/components/dashboard/route-map";
 import { RouteVisualization } from "@/frontend/components/dashboard/route-visualization";
-import { UpgradeOverlay } from "@/frontend/components/dashboard/upgrade-overlay";
+import { FreeShipmentSummary } from "@/frontend/components/dashboard/free-shipment-summary";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -259,22 +259,19 @@ export default async function ShipmentDetailPage({
           </div>
         </div>
 
-        {/* ── Cinematic Route Visualization ─────────────────────── */}
+        {/* ── Route Visualization ──────────────────────────────────
+            FREE: clear "where is my container?" summary card.
+            PRO/CUSTOM: full animated route visualization.        */}
         {isFreePlan ? (
-          <UpgradeOverlay
-            feature="Route Visualization"
-            description="Upgrade to PRO to see the animated route map with live vessel position and port-by-port progress."
-          >
-            <RouteVisualization
-              origin={shipment.origin}
-              destination={shipment.destination}
-              type={shipment.type}
-              currentStatus={shipment.currentStatus}
-              atdDate={shipment.atdDate}
-              etaDate={shipment.etaDate}
-              ataDate={shipment.ataDate}
-            />
-          </UpgradeOverlay>
+          <FreeShipmentSummary
+            type={shipment.type}
+            currentLocation={shipment.currentLocation}
+            origin={shipment.origin}
+            destination={shipment.destination}
+            currentStatus={shipment.currentStatus}
+            etaDate={shipment.etaDate}
+            ataDate={shipment.ataDate}
+          />
         ) : (
           <RouteVisualization
             origin={shipment.origin}
@@ -341,16 +338,72 @@ export default async function ShipmentDetailPage({
           </h3>
 
           {isFreePlan ? (
-            <UpgradeOverlay
-              feature="Event History"
-              description="Upgrade to PRO to see the full tracking timeline — every port, vessel departure, and customs event."
-            >
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 rounded-lg bg-navy-100 dark:bg-navy-800" />
-                ))}
+            <div>
+              {/* Show only the latest event for FREE users */}
+              {shipment.trackingEvents.length === 0 ? (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <Clock size={28} className="text-navy-300 dark:text-navy-600" />
+                  <p className="mt-2 text-sm text-navy-500 dark:text-navy-400">
+                    No tracking events yet. Updates will appear once the carrier reports movement.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative ml-4">
+                  <div className="relative flex gap-4 pl-6">
+                    <div className="absolute -left-2 top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-teal-500 bg-white dark:border-teal-400 dark:bg-navy-900">
+                      <div className="h-1.5 w-1.5 rounded-full bg-teal-500 dark:bg-teal-400" />
+                    </div>
+                    <div className="flex-1 pb-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <EventIcon status={shipment.trackingEvents[0].status} />
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-xs font-bold",
+                              getStatusColor(shipment.trackingEvents[0].status),
+                            )}
+                          >
+                            {getStatusLabel(shipment.trackingEvents[0].status)}
+                          </span>
+                        </div>
+                        <time className="flex-shrink-0 text-xs text-navy-400 dark:text-navy-500">
+                          {formatDate(shipment.trackingEvents[0].eventDate, "MMM d, yyyy HH:mm")}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm text-navy-700 dark:text-navy-300">
+                        {shipment.trackingEvents[0].description}
+                      </p>
+                      {shipment.trackingEvents[0].location && (
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-navy-400 dark:text-navy-500">
+                          <MapPin size={10} />
+                          {shipment.trackingEvents[0].location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upgrade prompt — single, friendly, non-blocking */}
+              <div className="mt-6 rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-5 dark:border-orange-500/30 dark:from-orange-500/10 dark:to-amber-500/10">
+                <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex-1">
+                    <p className="font-bold text-navy-900 dark:text-white">
+                      See every port and vessel movement
+                    </p>
+                    <p className="mt-1 text-sm text-navy-600 dark:text-navy-300">
+                      Full timeline, live world map, and 6-hour auto-updates with PRO.
+                    </p>
+                  </div>
+                  <Link
+                    href="/dashboard/billing"
+                    className="flex-shrink-0 rounded-xl bg-[#FF6A00] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(255,106,0,0.25)] transition-all hover:bg-[#FF7A1A] hover:shadow-[0_6px_18px_rgba(255,106,0,0.35)]"
+                  >
+                    Upgrade to PRO — $35/mo
+                  </Link>
+                </div>
               </div>
-            </UpgradeOverlay>
+            </div>
           ) : shipment.trackingEvents.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center">
               <Clock size={28} className="text-navy-300 dark:text-navy-600" />
@@ -435,8 +488,9 @@ export default async function ShipmentDetailPage({
             isFavorite={shipment.isFavorite}
           />
 
-          {/* Current location */}
-          {shipment.currentLocation && (
+          {/* Current location — only in sidebar for PRO/CUSTOM
+              (FREE users see it prominently in the main content). */}
+          {!isFreePlan && shipment.currentLocation && (
             <div className="rounded-xl border border-navy-200 bg-navy-50/50 p-4 dark:border-navy-800 dark:bg-navy-800/50">
               <h4 className="text-xs font-bold uppercase tracking-wider text-navy-400 dark:text-navy-500 mb-2">
                 Current Location
@@ -448,15 +502,10 @@ export default async function ShipmentDetailPage({
             </div>
           )}
 
-          {/* Route map */}
-          {isFreePlan ? (
-            <UpgradeOverlay
-              feature="Live Map"
-              description="Upgrade to PRO to see the real-time world map with vessel position."
-            >
-              <div className="h-40 rounded-xl bg-navy-100 dark:bg-navy-800" />
-            </UpgradeOverlay>
-          ) : (
+          {/* Route map — PRO/CUSTOM only.
+              FREE users get a friendly upgrade nudge under tracking history,
+              not a locked map overlay. */}
+          {!isFreePlan && (
             <RouteMap
               origin={shipment.origin}
               destination={shipment.destination}
