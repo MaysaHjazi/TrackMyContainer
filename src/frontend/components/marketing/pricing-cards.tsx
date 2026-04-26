@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 const CARD_STYLES = {
   free:     "border-[#E5E7EB] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:border-navy-800 dark:bg-gradient-to-br dark:from-navy-900 dark:to-navy-950 dark:shadow-none",
   pro:      "border-[#FF6A00]/40 bg-white shadow-[0_10px_40px_rgba(255,106,0,0.12)] scale-[1.02] dark:border-orange-500/40 dark:bg-gradient-to-br dark:from-navy-900 dark:to-navy-950 dark:shadow-[0_0_30px_rgba(245,130,31,0.08)]",
-  business: "border-[#3B82F6]/40 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:border-teal-500/40 dark:bg-gradient-to-br dark:from-navy-900 dark:to-navy-950 dark:shadow-none",
+  custom: "border-[#3B82F6]/40 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:border-teal-500/40 dark:bg-gradient-to-br dark:from-navy-900 dark:to-navy-950 dark:shadow-none",
 };
 
 const CTA_STYLES = {
   free:     "bg-[#F5F7FA] text-[#1F2937] border border-[#E5E7EB] hover:bg-[#EEF2F6] dark:bg-navy-700 dark:text-white dark:border-0 dark:hover:bg-navy-600",
   pro:      "bg-[#FF6A00] text-white hover:bg-[#FF7A1A] shadow-[0_4px_12px_rgba(255,106,0,0.25)] hover:shadow-[0_6px_18px_rgba(255,106,0,0.35)] dark:bg-gradient-to-r dark:from-orange-500 dark:to-orange-600 dark:hover:from-orange-600 dark:hover:to-orange-700 dark:shadow-lg dark:shadow-orange-500/20",
-  business: "bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:shadow-[0_6px_18px_rgba(59,130,246,0.35)] dark:bg-gradient-to-r dark:from-teal-500 dark:to-teal-600 dark:hover:from-teal-600 dark:hover:to-teal-700 dark:shadow-lg dark:shadow-teal-500/20",
+  custom: "bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:shadow-[0_6px_18px_rgba(59,130,246,0.35)] dark:bg-gradient-to-r dark:from-teal-500 dark:to-teal-600 dark:hover:from-teal-600 dark:hover:to-teal-700 dark:shadow-lg dark:shadow-teal-500/20",
 };
 
 export function PricingCards() {
@@ -59,7 +59,7 @@ export function PricingCards() {
                   <h3 className="text-lg font-bold text-[#1F2937] dark:text-white">{plan.name}</h3>
                   <div className="mt-2 flex items-end gap-1">
                     <span className="text-4xl font-extrabold text-[#1F2937] dark:text-white">{plan.priceLabel}</span>
-                    {plan.price > 0 && (
+                    {plan.price !== null && plan.price > 0 && (
                       <span className="mb-1 text-sm text-[#6B7280] dark:text-navy-400">/month</span>
                     )}
                   </div>
@@ -76,7 +76,7 @@ export function PricingCards() {
                 </ul>
 
                 <Link
-                  href={plan.price === 0 ? "/track" : "/register"}
+                  href={plan.price === null ? "/contact" : plan.price === 0 ? "/track" : "/register"}
                   className={cn(
                     "mt-auto block rounded-xl px-6 py-3 text-center text-sm font-bold transition-all",
                     CTA_STYLES[styleKey],
