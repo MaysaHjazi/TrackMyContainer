@@ -111,8 +111,8 @@ model Subscription {
   trialEnd             DateTime?
 
   // Feature gates (denormalized for fast access)
-  maxTrackedShipments  Int                @default(0)
-  maxDailyQueries      Int                @default(5)
+  maxTrackedShipments  Int                @default(5)
+  maxDailyQueries      Int                @default(50)
   whatsappEnabled      Boolean            @default(false)
   apiAccessEnabled     Boolean            @default(false)
   maxTeamMembers       Int                @default(1)
@@ -128,7 +128,7 @@ model Subscription {
 enum SubscriptionPlan {
   FREE
   PRO
-  BUSINESS
+  CUSTOM
 }
 
 enum SubscriptionStatus {
@@ -183,6 +183,13 @@ model Shipment {
 
   // Polling
   lastPolledAt    DateTime?
+
+  // Provider used when this shipment was added
+  trackingProvider String  @default("jsoncargo")  // "jsoncargo" | "shipsgo"
+
+  // false = FREE plan (no worker polling ever for this shipment)
+  isLiveTracking   Boolean @default(false)
+
   pollFrequencyMins Int          @default(360)  // 6 hours
   isActive        Boolean        @default(true)
 
@@ -413,4 +420,28 @@ model WhatsappSession {
   updatedAt     DateTime  @updatedAt
 
   @@map("whatsapp_sessions")
+}
+
+// ══════════════════════════════════════════════════════════════
+// CONTACT REQUESTS
+// ══════════════════════════════════════════════════════════════
+
+model ContactRequest {
+  id              String               @id @default(cuid())
+  name            String
+  email           String
+  phone           String?
+  containersCount Int
+  message         String?
+  status          ContactRequestStatus @default(PENDING)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@map("contact_requests")
+}
+
+enum ContactRequestStatus {
+  PENDING
+  CONTACTED
+  CLOSED
 }
