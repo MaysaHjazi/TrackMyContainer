@@ -29,7 +29,7 @@ interface ShipmentData {
 
 interface Props {
   shipments: ShipmentData[];
-  /** Resolved SERVER-SIDE — true when plan is PRO or BUSINESS */
+  /** Resolved SERVER-SIDE — true when plan is PRO or CUSTOM */
   isPro: boolean;
 }
 

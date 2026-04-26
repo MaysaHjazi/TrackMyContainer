@@ -13,7 +13,7 @@ export function NotificationsGate() {
     try {
       const res = await fetch("/api/billing/upgrade", { method: "POST" });
       const data = await res.json();
-      if (data.plan === "PRO" || data.plan === "BUSINESS") {
+      if (data.plan === "PRO" || data.plan === "CUSTOM") {
         router.refresh();
       } else {
         alert(data.error || "Upgrade failed");
