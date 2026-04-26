@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Lock, Zap, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Lock, Zap } from "lucide-react";
 
 interface Props {
   feature: string;
@@ -11,30 +10,12 @@ interface Props {
 }
 
 /**
- * Wraps a pro-only feature with a blurred overlay + upgrade CTA.
+ * Wraps a PRO-only feature with a blurred overlay + upgrade CTA.
  * Children are rendered but blurred and non-interactive.
+ * Clicking "Upgrade" navigates to the billing page.
  */
 export function UpgradeOverlay({ feature, description, children }: Props) {
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/billing/upgrade", { method: "POST" });
-      const data = await res.json();
-      if (data.plan === "PRO" || data.plan === "BUSINESS") {
-        // Refresh the page to show unlocked features
-        router.refresh();
-      } else {
-        alert(data.error || "Upgrade failed");
-      }
-    } catch {
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="relative">
@@ -56,22 +37,16 @@ export function UpgradeOverlay({ feature, description, children }: Props) {
           </div>
 
           <button
-            onClick={handleUpgrade}
-            disabled={loading}
+            onClick={() => router.push("/dashboard/billing")}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600
                        px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25
-                       hover:from-orange-400 hover:to-orange-500 transition-all active:scale-95
-                       disabled:opacity-50"
+                       hover:from-orange-400 hover:to-orange-500 transition-all active:scale-95"
           >
-            {loading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Zap size={16} />
-            )}
-            Upgrade to Pro
+            <Zap size={16} />
+            Upgrade to PRO — $35/month
           </button>
 
-          <p className="text-[11px] text-navy-500">Starting at $29/month · 14-day free trial</p>
+          <p className="text-[11px] text-navy-500">Cancel anytime · ShipsGo live tracking</p>
         </div>
       </div>
     </div>

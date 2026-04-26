@@ -20,47 +20,44 @@ const PLANS = [
     period: "",
     icon: Zap,
     color: "navy",
-    description: "Single container or AWB lookup",
+    description: "5 containers lifetime, JSONCargo lookup",
     features: [
-      "5 tracking lookups per day",
+      "5 containers — lifetime total",
+      "One-time tracking lookup",
+      "Location, status & ETA/ATA dates",
       "Sea container & air AWB support",
-      "160+ shipping carriers",
-      "Shareable tracking links",
     ],
   },
   {
     id: "PRO",
     name: "Pro",
-    price: "$29",
+    price: "$35",
     period: "/month",
     icon: Crown,
     color: "orange",
     badge: "Most Popular",
-    description: "Dashboard, 50 shipments, WhatsApp alerts",
+    description: "10 containers/month, ShipsGo, live updates",
     features: [
-      "200 tracking lookups per day",
-      "Track up to 50 shipments",
-      "Real-time dashboard with world map",
-      "WhatsApp notifications",
-      "Email & Messenger alerts",
-      "CSV export",
+      "10 containers per billing period",
+      "ShipsGo live tracking (every 6h)",
+      "Interactive world map & route viz",
+      "Full event history timeline",
+      "Auto-updates — never stale",
     ],
   },
   {
-    id: "BUSINESS",
-    name: "Business",
-    price: "$99",
-    period: "/month",
+    id: "CUSTOM",
+    name: "Custom",
+    price: "Custom",
+    period: "",
     icon: Building2,
     color: "teal",
-    description: "Unlimited shipments, API access, team members",
+    description: "Unlimited containers, dedicated support",
     features: [
-      "Unlimited tracking lookups",
-      "Unlimited tracked shipments",
-      "REST API access",
-      "10 team member seats",
-      "Priority support",
-      "All Pro features",
+      "Unlimited containers — never blocked",
+      "ShipsGo live tracking (every 6h)",
+      "All PRO features included",
+      "Dedicated account manager",
     ],
   },
 ];
@@ -153,8 +150,8 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {PLANS.map((plan) => {
           const isCurrent = currentPlan === plan.id;
-          const isUpgrade = (currentPlan === "FREE" && plan.id !== "FREE") ||
-                           (currentPlan === "PRO" && plan.id === "BUSINESS");
+          const isCustom  = plan.id === "CUSTOM";
+          const isUpgrade = currentPlan === "FREE" && plan.id === "PRO";
           const Icon = plan.icon;
 
           return (
@@ -218,6 +215,15 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
                 >
                   Current Plan
                 </button>
+              ) : isCustom ? (
+                <a
+                  href="/contact"
+                  className="block w-full rounded-xl py-3 text-center text-sm font-bold text-white
+                             bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500
+                             shadow-lg shadow-teal-500/25 transition-all"
+                >
+                  Contact Us
+                </a>
               ) : isUpgrade ? (
                 <button
                   onClick={() => handleUpgrade(plan.id)}
@@ -240,13 +246,13 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
                   disabled
                   className="w-full rounded-xl py-3 text-sm font-bold text-navy-500 bg-white/5 border border-white/10 cursor-default"
                 >
-                  {plan.id === "FREE" ? "Free Forever" : "Downgrade"}
+                  {plan.id === "FREE" ? "Free Forever" : "Not Available"}
                 </button>
               )}
 
-              {/* Trial note */}
-              {isUpgrade && plan.id !== "FREE" && (
-                <p className="text-center text-[11px] text-navy-500 mt-2">14-day free trial included</p>
+              {/* Trial note — only for PRO upgrade CTA */}
+              {isUpgrade && plan.id === "PRO" && (
+                <p className="text-center text-[11px] text-navy-500 mt-2">Cancel anytime</p>
               )}
             </div>
           );
