@@ -17,8 +17,8 @@ export async function POST() {
     return NextResponse.json({ error: "No subscription found" }, { status: 400 });
   }
 
-  // Already PRO or BUSINESS
-  if (user.subscription.plan === "PRO" || user.subscription.plan === "BUSINESS") {
+  // Already PRO or CUSTOM
+  if (user.subscription.plan === "PRO" || user.subscription.plan === "CUSTOM") {
     return NextResponse.json({ message: "Already upgraded", plan: user.subscription.plan });
   }
 

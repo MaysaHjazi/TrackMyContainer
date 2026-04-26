@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-export type PlanTier = "FREE" | "PRO" | "BUSINESS";
+export type PlanTier = "FREE" | "PRO" | "CUSTOM";
 
 export interface SubscriptionInfo {
   plan: PlanTier;
@@ -44,9 +44,9 @@ export function useSubscription() {
 
 /** Quick check helpers */
 export function isPro(sub: SubscriptionInfo) {
-  return sub.plan === "PRO" || sub.plan === "BUSINESS";
+  return sub.plan === "PRO" || sub.plan === "CUSTOM";
 }
 
 export function isBusiness(sub: SubscriptionInfo) {
-  return sub.plan === "BUSINESS";
+  return sub.plan === "CUSTOM";
 }

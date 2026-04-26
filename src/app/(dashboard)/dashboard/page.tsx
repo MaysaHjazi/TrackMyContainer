@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const plan = user.subscription?.plan ?? "FREE";
-  const isPro = plan === "PRO" || plan === "BUSINESS";
+  const isPro = plan === "PRO" || plan === "CUSTOM";
 
   // ── Fetch user's shipments from DB ──
   // Include delivered shipments (isActive=false) so they still show in stats

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 // ── Types ────────────────────────────────────────────────────
 
-type PlanId = "FREE" | "PRO" | "BUSINESS";
+type PlanId = "FREE" | "PRO" | "CUSTOM";
 
 interface Profile {
   id: string;
@@ -66,8 +66,8 @@ const PLAN_BADGES: Record<PlanId, { label: string; color: string }> = {
     label: "Pro",
     color: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400",
   },
-  BUSINESS: {
-    label: "Business",
+  CUSTOM: {
+    label: "Custom",
     color: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-400",
   },
 };

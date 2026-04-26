@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { planId } = await req.json();
-    const plan = planId === "PRO" ? PLANS.PRO : planId === "BUSINESS" ? PLANS.BUSINESS : null;
+    const plan = planId === "PRO" ? PLANS.PRO : planId === "CUSTOM" ? PLANS.CUSTOM : null;
 
     if (!plan || !plan.stripePriceId) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });

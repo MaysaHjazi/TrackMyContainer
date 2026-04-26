@@ -3,9 +3,9 @@ import type { SubscriptionPlan } from "@prisma/client";
 
 // ── Queries allowed per day per plan ──────────────────────────
 const DAILY_LIMITS: Record<SubscriptionPlan, number> = {
-  FREE:     5,
-  PRO:      200,
-  BUSINESS: -1,   // unlimited
+  FREE:   5,
+  PRO:    200,
+  CUSTOM: -1,   // unlimited
 };
 
 interface RateLimitResult {
