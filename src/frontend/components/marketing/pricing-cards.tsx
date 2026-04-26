@@ -103,7 +103,7 @@ export function PricingCards() {
         </div>
 
         <p className="mt-8 text-center text-sm text-[#9CA3AF] dark:text-navy-500">
-          All paid plans include a 14-day free trial. No credit card required to start.
+          Cancel anytime. No long-term commitment.
         </p>
       </div>
     </section>
