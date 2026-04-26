@@ -243,4 +243,55 @@ describe("POST /api/contact", () => {
     expect(res.status).toBe(201);
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
+
+  // ── 8. Resend throws → still 201 (best-effort) ───────────
+  it("returns 201 even when Resend throws", async () => {
+    process.env.RESEND_API_KEY = "test-key";
+    mockSendEmail.mockRejectedValue(new Error("Resend network error"));
+
+    mockPrisma.contactRequest.create.mockResolvedValue({
+      id: "clxyz3",
+      name: "Test",
+      email: "test@example.com",
+      containersCount: 50,
+      status: "PENDING",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const req = new Request("http://localhost/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Test", email: "test@example.com", containersCount: 50 }),
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+  });
+
+  // ── 9. Invalid JSON body → 400 ───────────────────────────
+  it("returns 400 for invalid JSON", async () => {
+    const req = new Request("http://localhost/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json-at-all{{{",
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+  });
+
+  // ── 10. Float containersCount → 400 ──────────────────────
+  it("returns 400 when containersCount is a float", async () => {
+    const req = new Request("http://localhost/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Test", email: "test@example.com", containersCount: 2.5 }),
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+  });
 });

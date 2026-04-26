@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/backend/lib/db";
 import { Resend } from "resend";
 
+function escHtml(s: string | null | undefined): string {
+  return String(s ?? "—").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // POST /api/contact — Save a custom plan enquiry and notify admin
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -22,7 +26,6 @@ export async function POST(req: NextRequest) {
   }
   if (
     containersCount === undefined ||
-    containersCount === null ||
     typeof containersCount !== "number" ||
     !Number.isInteger(containersCount) ||
     containersCount < 1
@@ -59,11 +62,11 @@ export async function POST(req: NextRequest) {
     const htmlBody = `
       <h2>New Custom Plan Request</h2>
       <table>
-        <tr><td><strong>Name</strong></td><td>${name.trim()}</td></tr>
-        <tr><td><strong>Email</strong></td><td>${email.trim()}</td></tr>
-        <tr><td><strong>Phone</strong></td><td>${phone ?? "—"}</td></tr>
-        <tr><td><strong>Containers Count</strong></td><td>${containersCount}</td></tr>
-        <tr><td><strong>Message</strong></td><td>${message ?? "—"}</td></tr>
+        <tr><td><strong>Name</strong></td><td>${escHtml(name.trim())}</td></tr>
+        <tr><td><strong>Email</strong></td><td>${escHtml(email.trim())}</td></tr>
+        <tr><td><strong>Phone</strong></td><td>${escHtml((phone as string | undefined)?.trim())}</td></tr>
+        <tr><td><strong>Containers Count</strong></td><td>${escHtml(String(containersCount))}</td></tr>
+        <tr><td><strong>Message</strong></td><td>${escHtml((message as string | undefined)?.trim())}</td></tr>
       </table>
     `;
 
