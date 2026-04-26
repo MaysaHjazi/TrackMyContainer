@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/backend/lib/db";
 import { getAuthenticatedUser, canAddShipment } from "@/lib/auth";
+import { PLANS, getProviderForPlan, type PlanKey } from "@/config/plans";
 import { createShipmentSchema, shipmentsQuerySchema } from "@/lib/validations";
 import { trackShipment, TrackingError } from "@/backend/services/tracking";
 import type { Prisma } from "@prisma/client";
@@ -63,12 +64,10 @@ export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const allowed = await canAddShipment(user);
+  // Check plan limit — new signature returns rich object
+  const { allowed, message, plan } = await canAddShipment(user.id);
   if (!allowed) {
-    return NextResponse.json(
-      { error: "Shipment limit reached. Upgrade your plan for more tracked shipments." },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: message }, { status: 403 });
   }
 
   const body = await req.json();
@@ -87,10 +86,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You are already tracking this number." }, { status: 409 });
   }
 
-  // Fetch initial tracking data
+  // Determine provider from plan
+  const provider       = getProviderForPlan(plan as PlanKey);  // "jsoncargo" | "shipsgo"
+  const isLiveTracking = PLANS[plan as PlanKey].liveTracking;  // false for FREE, true for PRO/CUSTOM
+
+  // Fetch initial tracking data using plan-specific provider
   let trackingData;
   try {
-    trackingData = await trackShipment(trackingNumber, { skipCache: true });
+    trackingData = await trackShipment(trackingNumber, {
+      skipCache:     true,
+      forceProvider: provider,
+    });
   } catch (err) {
     if (err instanceof TrackingError) {
       return NextResponse.json({ error: err.message }, { status: 422 });
@@ -98,40 +104,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch tracking data" }, { status: 500 });
   }
 
-  // Create shipment with enriched data
+  // Create shipment with enriched data + plan-specific fields
   const shipment = await prisma.shipment.create({
     data: {
-      userId: user.id,
-      trackingNumber: trackingData.trackingNumber,
+      userId:           user.id,
+      trackingNumber:   trackingData.trackingNumber,
       type,
-      carrier: trackingData.carrier,
-      carrierCode: trackingData.carrierCode,
-      origin: trackingData.origin,
-      destination: trackingData.destination,
-      currentStatus: trackingData.currentStatus,
-      currentLocation: trackingData.currentLocation,
+      carrier:          trackingData.carrier,
+      carrierCode:      trackingData.carrierCode,
+      origin:           trackingData.origin,
+      destination:      trackingData.destination,
+      currentStatus:    trackingData.currentStatus,
+      currentLocation:  trackingData.currentLocation,
       // If the shipment was already arrived on first add, the carrier's
       // ETA field has been overwritten with the actual arrival date —
       // skip saving it so we don't show a redundant (ETA == ATA) value.
-      etaDate: trackingData.ataDate ? null : trackingData.etaDate,
-      etdDate: trackingData.etdDate,
-      atdDate: trackingData.atdDate,
-      ataDate: trackingData.ataDate,
-      vesselName: trackingData.vesselName,
-      voyageNumber: trackingData.voyageNumber,
-      flightNumber: trackingData.flightNumber,
+      etaDate:          trackingData.ataDate ? null : trackingData.etaDate,
+      etdDate:          trackingData.etdDate,
+      atdDate:          trackingData.atdDate,
+      ataDate:          trackingData.ataDate,
+      vesselName:       trackingData.vesselName,
+      voyageNumber:     trackingData.voyageNumber,
+      flightNumber:     trackingData.flightNumber,
       nickname,
       reference,
       notifyEmail,
       notifyWhatsapp,
-      lastPolledAt: new Date(),
+      lastPolledAt:     new Date(),
+      trackingProvider: provider,       // "jsoncargo" or "shipsgo"
+      isLiveTracking,                   // false for FREE, true for PRO/CUSTOM
       trackingEvents: {
         create: trackingData.events.map((e) => ({
-          status: e.status,
-          location: e.location,
+          status:      e.status,
+          location:    e.location,
           description: e.description,
-          eventDate: e.eventDate,
-          source: e.source,
+          eventDate:   e.eventDate,
+          source:      e.source,
         })),
       },
     },

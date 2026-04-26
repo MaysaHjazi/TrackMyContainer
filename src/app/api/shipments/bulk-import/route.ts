@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     for (const row of rows) {
       try {
         // Check shipment limit before each creation
-        const allowed = await canAddShipment(user);
-        if (!allowed) {
+        const result = await canAddShipment(user.id);
+        if (!result.allowed) {
           failed.push({
             trackingNumber: row.trackingNumber,
             error: "Shipment limit reached",
