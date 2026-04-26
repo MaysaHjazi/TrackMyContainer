@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         error:     "Rate limit exceeded. Upgrade to Pro for more lookups.",
         resetAt:   rl.resetAt,
         remaining: 0,
-        upgradeUrl: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+        upgradeUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
       },
       {
         status: 429,

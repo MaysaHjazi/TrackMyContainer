@@ -1,30 +1,7 @@
-"use client";
-
-import { useState } from "react";
-import { Lock, Zap, BarChart3, TrendingUp, PieChart, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Lock, Zap, BarChart3, TrendingUp, PieChart } from "lucide-react";
 
 export function AnalyticsGate() {
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/billing/upgrade", { method: "POST" });
-      const data = await res.json();
-      if (data.plan === "PRO" || data.plan === "CUSTOM") {
-        router.refresh();
-      } else {
-        alert(data.error || "Upgrade failed");
-      }
-    } catch {
-      alert("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
       <div className="flex flex-col items-center text-center">
@@ -58,19 +35,17 @@ export function AnalyticsGate() {
           </div>
         </div>
 
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
+        <Link
+          href="/dashboard/billing"
           className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600
                      px-8 py-4 text-base font-bold text-white shadow-lg shadow-orange-500/25
-                     hover:from-orange-400 hover:to-orange-500 transition-all active:scale-95
-                     disabled:opacity-50"
+                     hover:from-orange-400 hover:to-orange-500 transition-all active:scale-95"
         >
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+          <Zap size={18} />
           Upgrade to Pro
-        </button>
+        </Link>
 
-        <p className="text-sm text-navy-500 mt-3">Starting at $29/month · 14-day free trial</p>
+        <p className="text-sm text-navy-500 mt-3">$35/month · Cancel anytime</p>
       </div>
     </div>
   );

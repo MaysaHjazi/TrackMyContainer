@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Zap, Crown, Building2, Loader2, ExternalLink } from "lucide-react";
+import { Check, Zap, Crown, Building2, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -64,9 +64,11 @@ const PLANS = [
 
 export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd, hasStripeCustomer }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleUpgrade = async (planId: string) => {
     setLoading(planId);
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -77,10 +79,10 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error(data.error || "Failed to start checkout");
+        setErrorMessage(data.error || "Failed to start checkout. Please try again.");
       }
     } catch {
-      console.error("Something went wrong. Please try again.");
+      setErrorMessage("Network error. Please check your connection and try again.");
     } finally {
       setLoading(null);
     }
@@ -88,6 +90,7 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
 
   const handleManageBilling = async () => {
     setLoading("manage");
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/billing/portal", {
         method: "POST",
@@ -97,10 +100,10 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error(data.error || "Failed to open billing portal");
+        setErrorMessage(data.error || "Failed to open billing portal.");
       }
     } catch {
-      console.error("Something went wrong. Please try again.");
+      setErrorMessage("Network error. Please check your connection and try again.");
     } finally {
       setLoading(null);
     }
@@ -145,6 +148,27 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
           </button>
         )}
       </div>
+
+      {/* Error banner */}
+      {errorMessage && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3"
+        >
+          <AlertCircle size={18} className="mt-0.5 flex-shrink-0 text-red-400" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-300">Something went wrong</p>
+            <p className="mt-0.5 text-sm text-red-200/80">{errorMessage}</p>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-xs font-medium text-red-300/70 hover:text-red-300"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

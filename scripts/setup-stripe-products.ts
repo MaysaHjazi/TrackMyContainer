@@ -1,7 +1,9 @@
 /**
- * Run once to create Stripe products and prices.
+ * Run once to create the Stripe product + price for the PRO plan.
  * Usage: npx tsx scripts/setup-stripe-products.ts
- * Then copy the resulting price IDs into your .env.local
+ * Then copy the resulting price ID into your .env.local
+ *
+ * Note: CUSTOM plan has no Stripe price — it's contact-us only.
  */
 
 import Stripe from "stripe";
@@ -23,35 +25,23 @@ async function setup() {
 
   console.log(`✅ Product created: ${product.id}`);
 
-  // ── Pro Plan — $29/month ──────────────────────────────────────
+  // ── Pro Plan — $35/month ──────────────────────────────────────
   const proPrice = await stripe.prices.create({
     product:    product.id,
     currency:   "usd",
-    unit_amount: 2900,
+    unit_amount: 3500,
     recurring:  { interval: "month" },
     nickname:   "Pro Monthly",
     metadata:   { plan: "PRO" },
   });
 
-  console.log(`✅ Pro price created:      ${proPrice.id}`);
-
-  // ── Business Plan — $99/month ─────────────────────────────────
-  const businessPrice = await stripe.prices.create({
-    product:    product.id,
-    currency:   "usd",
-    unit_amount: 9900,
-    recurring:  { interval: "month" },
-    nickname:   "Business Monthly",
-    metadata:   { plan: "BUSINESS" },
-  });
-
-  console.log(`✅ Business price created: ${businessPrice.id}`);
+  console.log(`✅ Pro price created: ${proPrice.id}`);
 
   console.log("\n─────────────────────────────────────────────────");
-  console.log("Add these to your .env.local:");
+  console.log("Add this to your .env.local:");
   console.log(`STRIPE_PRO_PRICE_ID=${proPrice.id}`);
-  console.log(`STRIPE_BUSINESS_PRICE_ID=${businessPrice.id}`);
   console.log("─────────────────────────────────────────────────");
+  console.log("\nCUSTOM plan: no Stripe price — handled via /contact form.\n");
 }
 
 setup().catch(console.error);
