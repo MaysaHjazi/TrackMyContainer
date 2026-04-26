@@ -25,7 +25,10 @@ export async function trackingPollProcessor(
   }
 
   // Force-fetch fresh data (skip cache)
-  const result = await trackShipment(trackingNumber, { skipCache: true });
+  const result = await trackShipment(trackingNumber, {
+    skipCache:     true,
+    forceProvider: job.data.trackingProvider,  // re-poll using same provider as original add
+  });
 
   const statusChanged  = result.currentStatus !== shipment.currentStatus;
   const etaChanged     = result.etaDate?.toISOString() !== shipment.etaDate?.toISOString();

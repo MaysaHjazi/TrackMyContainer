@@ -11,12 +11,16 @@ import { trackingPollQueue } from "@/backend/lib/queue";
 export async function trackingDispatchProcessor(job: Job): Promise<void> {
   console.log(`[tracking-dispatch] Processing job ${job.id} (${job.name})`);
   const shipments = await prisma.shipment.findMany({
-    where: { isActive: true },
+    where: {
+      isActive:       true,
+      isLiveTracking: true,   // FREE shipments (isLiveTracking=false) are excluded
+    },
     select: {
-      id:             true,
-      trackingNumber: true,
-      type:           true,
-      userId:         true,
+      id:               true,
+      trackingNumber:   true,
+      type:             true,
+      userId:           true,
+      trackingProvider: true,  // needed by poll processor to re-poll with same provider
     },
   });
 
@@ -29,10 +33,11 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
     await trackingPollQueue.add(
       "poll",
       {
-        shipmentId:     s.id,
-        trackingNumber: s.trackingNumber,
-        type:           s.type,
-        userId:         s.userId,
+        shipmentId:       s.id,
+        trackingNumber:   s.trackingNumber,
+        type:             s.type,
+        userId:           s.userId,
+        trackingProvider: s.trackingProvider,  // "jsoncargo" | "shipsgo"
       },
       { jobId: s.id },
     );

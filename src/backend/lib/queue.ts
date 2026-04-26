@@ -76,10 +76,11 @@ export async function scheduleTrackingDispatcher(): Promise<void> {
 // ── Job payload types ─────────────────────────────────────────
 
 export interface TrackingPollJobData {
-  shipmentId:    string;
-  trackingNumber: string;
-  type:          "SEA" | "AIR";
-  userId:        string;
+  shipmentId:       string;
+  trackingNumber:   string;
+  type:             "SEA" | "AIR";
+  userId:           string;
+  trackingProvider?: string;  // "jsoncargo" | "shipsgo" — used for forced re-poll
 }
 
 export interface NotificationJobData {
