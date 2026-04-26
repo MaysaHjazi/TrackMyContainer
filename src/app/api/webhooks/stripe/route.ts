@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
             plan:                "FREE",
             stripeSubscriptionId: null,
             stripePriceId:       null,
-            maxTrackedShipments: 0,
-            maxDailyQueries:     5,
+            maxTrackedShipments: 5,   // FREE plan limit
+            maxDailyQueries:     50,
             whatsappEnabled:     false,
             apiAccessEnabled:    false,
           },
@@ -72,9 +72,22 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         if (invoice.subscription) {
+          // Extract billing period from invoice lines (most reliable source)
+          const line        = (invoice.lines?.data?.[0] as unknown as { period?: { start?: number; end?: number } });
+          const periodStart = line?.period?.start
+            ? new Date(line.period.start * 1000)
+            : undefined;
+          const periodEnd   = line?.period?.end
+            ? new Date(line.period.end * 1000)
+            : undefined;
+
           await prisma.subscription.updateMany({
             where: { stripeSubscriptionId: invoice.subscription as string },
-            data:  { status: "ACTIVE" },
+            data:  {
+              status: "ACTIVE",
+              ...(periodStart ? { currentPeriodStart: periodStart } : {}),
+              ...(periodEnd   ? { currentPeriodEnd:   periodEnd   } : {}),
+            },
           });
         }
         break;
@@ -108,10 +121,10 @@ export async function POST(req: NextRequest) {
 async function syncSubscription(sub: Stripe.Subscription) {
   const priceId = sub.items.data[0]?.price.id ?? null;
 
-  // Determine plan from price ID
-  let plan: "FREE" | "PRO" | "BUSINESS" = "FREE";
-  if (priceId === process.env.STRIPE_PRO_PRICE_ID)      plan = "PRO";
-  if (priceId === process.env.STRIPE_BUSINESS_PRICE_ID) plan = "BUSINESS";
+  // CUSTOM plan has no Stripe price — it's set manually by admin
+  // Only PRO maps to a Stripe price ID
+  let plan: "FREE" | "PRO" = "FREE";
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) plan = "PRO";
 
   const planConfig = PLANS[plan];
   const features   = planConfig.features;
