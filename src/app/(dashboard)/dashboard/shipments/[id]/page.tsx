@@ -31,6 +31,7 @@ import type { ShipmentStatus } from "@prisma/client";
 import { ShipmentActions } from "./shipment-actions";
 import { RouteMap } from "@/frontend/components/dashboard/route-map";
 import { RouteVisualization } from "@/frontend/components/dashboard/route-visualization";
+import { UpgradeOverlay } from "@/frontend/components/dashboard/upgrade-overlay";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -166,6 +167,8 @@ export default async function ShipmentDetailPage({
 
   if (!shipment) notFound();
 
+  const isFreePlan = user.subscription?.plan === "FREE" || !user.subscription;
+
   const TypeIcon = shipment.type === "SEA" ? Ship : Plane;
   const typeColorClass =
     shipment.type === "SEA"
@@ -257,15 +260,32 @@ export default async function ShipmentDetailPage({
         </div>
 
         {/* ── Cinematic Route Visualization ─────────────────────── */}
-        <RouteVisualization
-          origin={shipment.origin}
-          destination={shipment.destination}
-          type={shipment.type}
-          currentStatus={shipment.currentStatus}
-          atdDate={shipment.atdDate}
-          etaDate={shipment.etaDate}
-          ataDate={shipment.ataDate}
-        />
+        {isFreePlan ? (
+          <UpgradeOverlay
+            feature="Route Visualization"
+            description="Upgrade to PRO to see the animated route map with live vessel position and port-by-port progress."
+          >
+            <RouteVisualization
+              origin={shipment.origin}
+              destination={shipment.destination}
+              type={shipment.type}
+              currentStatus={shipment.currentStatus}
+              atdDate={shipment.atdDate}
+              etaDate={shipment.etaDate}
+              ataDate={shipment.ataDate}
+            />
+          </UpgradeOverlay>
+        ) : (
+          <RouteVisualization
+            origin={shipment.origin}
+            destination={shipment.destination}
+            type={shipment.type}
+            currentStatus={shipment.currentStatus}
+            atdDate={shipment.atdDate}
+            etaDate={shipment.etaDate}
+            ataDate={shipment.ataDate}
+          />
+        )}
 
         {/* ── Dates Card ──────────────────────────────────────── */}
         {/* Only render cards for dates we actually have — carriers like
@@ -320,7 +340,18 @@ export default async function ShipmentDetailPage({
             Tracking History
           </h3>
 
-          {shipment.trackingEvents.length === 0 ? (
+          {isFreePlan ? (
+            <UpgradeOverlay
+              feature="Event History"
+              description="Upgrade to PRO to see the full tracking timeline — every port, vessel departure, and customs event."
+            >
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 rounded-lg bg-navy-100 dark:bg-navy-800" />
+                ))}
+              </div>
+            </UpgradeOverlay>
+          ) : shipment.trackingEvents.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center">
               <Clock size={28} className="text-navy-300 dark:text-navy-600" />
               <p className="mt-2 text-sm text-navy-500 dark:text-navy-400">
@@ -418,11 +449,20 @@ export default async function ShipmentDetailPage({
           )}
 
           {/* Route map */}
-          <RouteMap
-            origin={shipment.origin}
-            destination={shipment.destination}
-            currentLocation={shipment.currentLocation}
-          />
+          {isFreePlan ? (
+            <UpgradeOverlay
+              feature="Live Map"
+              description="Upgrade to PRO to see the real-time world map with vessel position."
+            >
+              <div className="h-40 rounded-xl bg-navy-100 dark:bg-navy-800" />
+            </UpgradeOverlay>
+          ) : (
+            <RouteMap
+              origin={shipment.origin}
+              destination={shipment.destination}
+              currentLocation={shipment.currentLocation}
+            />
+          )}
 
           {/* Shipment details */}
           <div className="space-y-2 text-xs">
@@ -438,12 +478,14 @@ export default async function ShipmentDetailPage({
                 {formatDate(shipment.createdAt)}
               </span>
             </div>
-            <div className="flex items-center justify-between text-navy-400 dark:text-navy-500">
-              <span>Last updated</span>
-              <span className="font-semibold text-navy-700 dark:text-navy-300">
-                {shipment.lastPolledAt ? formatDate(shipment.lastPolledAt) : "—"}
-              </span>
-            </div>
+            {!isFreePlan && (
+              <div className="flex items-center justify-between text-navy-400 dark:text-navy-500">
+                <span>Last updated</span>
+                <span className="font-semibold text-navy-700 dark:text-navy-300">
+                  {shipment.lastPolledAt ? formatDate(shipment.lastPolledAt) : "—"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </aside>
