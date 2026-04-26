@@ -9,6 +9,7 @@ export function ContactForm() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setStatus("loading")
+    setErrorMessage("")
 
     const form = e.currentTarget
     const data = {
@@ -17,6 +18,12 @@ export function ContactForm() {
       phone:           (form.elements.namedItem("phone")           as HTMLInputElement).value || undefined,
       containersCount: Number((form.elements.namedItem("containersCount") as HTMLInputElement).value),
       message:         (form.elements.namedItem("message")         as HTMLTextAreaElement).value || undefined,
+    }
+
+    if (!data.containersCount || data.containersCount < 1 || !Number.isInteger(data.containersCount)) {
+      setErrorMessage("Please enter a valid number of containers (whole number, at least 1).")
+      setStatus("error")
+      return
     }
 
     try {
@@ -59,7 +66,7 @@ export function ContactForm() {
           Name <span className="text-red-500">*</span>
         </label>
         <input
-          id="name" name="name" type="text" required
+          id="name" name="name" type="text" required autoComplete="name"
           className="w-full rounded-xl border border-[#E5E7EB] dark:border-navy-600 bg-transparent px-4 py-2.5 text-sm text-[#1F2937] dark:text-white placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/40"
           placeholder="Your name"
         />
@@ -71,7 +78,7 @@ export function ContactForm() {
           Email <span className="text-red-500">*</span>
         </label>
         <input
-          id="email" name="email" type="email" required
+          id="email" name="email" type="email" required autoComplete="email"
           className="w-full rounded-xl border border-[#E5E7EB] dark:border-navy-600 bg-transparent px-4 py-2.5 text-sm text-[#1F2937] dark:text-white placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/40"
           placeholder="you@company.com"
         />
@@ -83,7 +90,7 @@ export function ContactForm() {
           Phone <span className="text-[#9CA3AF] font-normal">(optional)</span>
         </label>
         <input
-          id="phone" name="phone" type="tel"
+          id="phone" name="phone" type="tel" autoComplete="tel"
           className="w-full rounded-xl border border-[#E5E7EB] dark:border-navy-600 bg-transparent px-4 py-2.5 text-sm text-[#1F2937] dark:text-white placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/40"
           placeholder="+1 555 000 0000"
         />

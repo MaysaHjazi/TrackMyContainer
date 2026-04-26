@@ -15,6 +15,20 @@ const CTA_STYLES = {
   custom: "bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:shadow-[0_6px_18px_rgba(59,130,246,0.35)] dark:bg-gradient-to-r dark:from-teal-500 dark:to-teal-600 dark:hover:from-teal-600 dark:hover:to-teal-700 dark:shadow-lg dark:shadow-teal-500/20",
 };
 
+function getCardStyle(key: string): string {
+  const k = key.toLowerCase();
+  return k in CARD_STYLES
+    ? CARD_STYLES[k as keyof typeof CARD_STYLES]
+    : CARD_STYLES.free; // safe fallback
+}
+
+function getCtaStyle(key: string): string {
+  const k = key.toLowerCase();
+  return k in CTA_STYLES
+    ? CTA_STYLES[k as keyof typeof CTA_STYLES]
+    : CTA_STYLES.free;
+}
+
 export function PricingCards() {
   return (
     <section className="relative py-24 overflow-hidden
@@ -36,13 +50,12 @@ export function PricingCards() {
 
         <div className="grid gap-8 lg:grid-cols-3 lg:items-center">
           {Object.entries(PLANS).map(([key, plan]) => {
-            const styleKey = key.toLowerCase() as keyof typeof CARD_STYLES;
             return (
               <div
                 key={key}
                 className={cn(
                   "relative rounded-2xl border-2 p-8 flex flex-col gap-6 transition-shadow",
-                  CARD_STYLES[styleKey],
+                  getCardStyle(key),
                 )}
               >
                 {plan.badge && (
@@ -79,7 +92,7 @@ export function PricingCards() {
                   href={plan.price === null ? "/contact" : plan.price === 0 ? "/track" : "/register"}
                   className={cn(
                     "mt-auto block rounded-xl px-6 py-3 text-center text-sm font-bold transition-all",
-                    CTA_STYLES[styleKey],
+                    getCtaStyle(key),
                   )}
                 >
                   {plan.cta}
