@@ -431,7 +431,7 @@ model ContactRequest {
   name            String
   email           String
   phone           String?
-  containersCount Int
+  containersCount Int                  // how many containers/month they need to track
   message         String?
   status          ContactRequestStatus @default(PENDING)
   createdAt       DateTime             @default(now())
