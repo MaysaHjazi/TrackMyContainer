@@ -28,6 +28,7 @@ import { getCachedTracking, setCachedTracking } from "./cache";
 import { LufthansaCargoProvider }              from "./providers/lufthansa";
 import { QatarAirwaysCargoProvider }           from "./providers/qatar";
 import { JsonCargoProvider }                   from "./providers/jsoncargo";
+import { ShipsgoProvider }                     from "./providers/shipsgo";
 
 // ── Provider registry ─────────────────────────────────────────
 function getProvider(name: string): TrackingProvider | null {
@@ -40,6 +41,8 @@ function getProvider(name: string): TrackingProvider | null {
         : null;
     case "jsoncargo":
       return process.env.JSONCARGO_API_KEY ? new JsonCargoProvider() : null;
+    case "shipsgo":
+      return process.env.SHIPSGO_API_KEY ? new ShipsgoProvider() : null;
     // ── Placeholder — wire up once key is ready ────────────────
     // case "cargoai":
     //   return process.env.CARGOAI_API_KEY ? new CargoAiProvider() : null;
@@ -51,7 +54,7 @@ function getProvider(name: string): TrackingProvider | null {
 // ── Main export ───────────────────────────────────────────────
 export async function trackShipment(
   rawInput: string,
-  options: { skipCache?: boolean } = {},
+  options: { skipCache?: boolean; forceProvider?: string } = {},
 ): Promise<TrackingResult> {
 
   // 1. Parse identifier
@@ -69,14 +72,16 @@ export async function trackShipment(
     fallbackProviders,
   } = parsed;
 
-  // 2. Cache check
-  if (!options.skipCache) {
+  // 2. Cache check (skip when forceProvider is set — caller wants specific fresh data)
+  if (!options.skipCache && !options.forceProvider) {
     const cached = await getCachedTracking(normalized);
     if (cached) return cached;
   }
 
-  // 3. Build provider chain: preferred first, then fallbacks (deduplicated)
-  const chain = [...new Set([preferredProvider, ...fallbackProviders])].filter(Boolean);
+  // 3. Build provider chain — if forceProvider is set, use it exclusively
+  const chain = options.forceProvider
+    ? [options.forceProvider]
+    : [...new Set([preferredProvider, ...fallbackProviders])].filter(Boolean);
 
   let lastError: string | null = null;
 
