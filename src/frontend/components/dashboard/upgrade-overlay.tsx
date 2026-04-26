@@ -1,12 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Zap } from "lucide-react";
+import { PLANS } from "@/config/plans";
 
 interface Props {
   feature: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 /**
@@ -20,7 +22,7 @@ export function UpgradeOverlay({ feature, description, children }: Props) {
   return (
     <div className="relative">
       {/* Blurred content behind */}
-      <div className="pointer-events-none select-none blur-[6px] opacity-50">
+      <div aria-hidden="true" className="pointer-events-none select-none blur-[6px] opacity-50">
         {children}
       </div>
 
@@ -43,7 +45,7 @@ export function UpgradeOverlay({ feature, description, children }: Props) {
                        hover:from-orange-400 hover:to-orange-500 transition-all active:scale-95"
           >
             <Zap size={16} />
-            Upgrade to PRO — $35/month
+            Upgrade to PRO — {PLANS.PRO.priceLabel}/month
           </button>
 
           <p className="text-[11px] text-navy-500">Cancel anytime · ShipsGo live tracking</p>

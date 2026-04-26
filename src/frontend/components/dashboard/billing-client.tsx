@@ -77,10 +77,10 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Failed to start checkout");
+        console.error(data.error || "Failed to start checkout");
       }
     } catch {
-      alert("Something went wrong. Please try again.");
+      console.error("Something went wrong. Please try again.");
     } finally {
       setLoading(null);
     }
@@ -97,10 +97,10 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Failed to open billing portal");
+        console.error(data.error || "Failed to open billing portal");
       }
     } catch {
-      alert("Something went wrong. Please try again.");
+      console.error("Something went wrong. Please try again.");
     } finally {
       setLoading(null);
     }
@@ -165,7 +165,7 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
               )}
             >
               {/* Badge */}
-              {plan.badge && (
+              {plan.badge && !isCurrent && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">
                     {plan.badge}
@@ -251,7 +251,7 @@ export function BillingClient({ currentPlan, status, trialEnd, currentPeriodEnd,
               )}
 
               {/* Trial note — only for PRO upgrade CTA */}
-              {isUpgrade && plan.id === "PRO" && (
+              {isUpgrade && (
                 <p className="text-center text-[11px] text-navy-500 mt-2">Cancel anytime</p>
               )}
             </div>
