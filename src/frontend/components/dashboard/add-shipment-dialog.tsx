@@ -60,6 +60,48 @@ export function AddShipmentDialog() {
     setLoading(false);
   }
 
+  async function submitTrackingRequest(confirmCharge: boolean): Promise<void> {
+    const res = await fetch("/api/shipments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trackingNumber: trackingNumber.trim().toUpperCase(),
+        type,
+        nickname: nickname.trim() || undefined,
+        reference: reference.trim() || undefined,
+        notifyEmail,
+        notifyWhatsapp,
+        confirmCharge,
+      }),
+    });
+
+    if (res.ok) {
+      resetForm();
+      setOpen(false);
+      router.refresh();
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+
+    // 409 + WILL_CHARGE_CREDIT → ask the user explicitly before paying.
+    if (res.status === 409 && data?.code === "WILL_CHARGE_CREDIT") {
+      const confirmed = window.confirm(
+        `${data.message}\n\nProceed and use 1 credit?`,
+      );
+      if (confirmed) {
+        await submitTrackingRequest(true);  // retry with explicit consent
+      }
+      return;
+    }
+
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : "Failed to add shipment. Please check the tracking number.",
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!trackingNumber.trim()) {
@@ -71,31 +113,7 @@ export function AddShipmentDialog() {
     setError(null);
 
     try {
-      const res = await fetch("/api/shipments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trackingNumber: trackingNumber.trim().toUpperCase(),
-          type,
-          nickname: nickname.trim() || undefined,
-          reference: reference.trim() || undefined,
-          notifyEmail,
-          notifyWhatsapp,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(
-          typeof data.error === "string"
-            ? data.error
-            : "Failed to add shipment. Please check the tracking number.",
-        );
-      }
-
-      resetForm();
-      setOpen(false);
-      router.refresh();
+      await submitTrackingRequest(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {

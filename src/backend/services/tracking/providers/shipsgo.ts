@@ -61,6 +61,37 @@ export class ShipsgoProvider implements TrackingProvider {
   private get apiKey()  { return process.env.SHIPSGO_API_KEY ?? ""; }
   private get baseUrl() { return process.env.SHIPSGO_BASE_URL ?? "https://api.shipsgo.com/v2"; }
 
+  /**
+   * Check if a tracking number is already in our ShipsGo cache.
+   * FREE — uses GET search endpoint, never creates a new shipment,
+   * never consumes credits. Returns true if found (adding it later
+   * will be free), false otherwise (adding will cost 1 credit).
+   */
+  async existsInCache(trackingNumber: string, type: ShipmentType): Promise<boolean> {
+    if (!this.apiKey) return false;
+    try {
+      const path = type === "AIR"
+        ? `/air/shipments?awb_number=${encodeURIComponent(trackingNumber)}&limit=10`
+        : `/ocean/shipments?container_number=${encodeURIComponent(trackingNumber)}&limit=10`;
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        headers: this.headers(),
+        signal:  AbortSignal.timeout(8_000),
+        next:    { revalidate: 0 },
+      });
+      if (!res.ok) return false;
+      const data = await res.json() as {
+        shipments?: Array<{ awb_number?: string; container_number?: string }>;
+      };
+      const norm = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+      const target = norm(trackingNumber);
+      return (data.shipments ?? []).some(
+        (s) => norm(s.awb_number ?? s.container_number ?? "") === target,
+      );
+    } catch {
+      return false;
+    }
+  }
+
   // Poll config
   private readonly POLL_MAX_MS    = 35_000;   // total budget for async wait
   private readonly POLL_INTERVAL  = 4_000;    // between polls
