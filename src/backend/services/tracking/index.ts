@@ -31,6 +31,19 @@ import { JsonCargoProvider }                   from "./providers/jsoncargo";
 import { ShipsgoProvider }                     from "./providers/shipsgo";
 
 // ── Provider registry ─────────────────────────────────────────
+/**
+ * Loose match for location strings — providers return "CASABLANCA",
+ * "Casablanca, MA", "Casablanca Port", etc. We strip non-letters and
+ * check substring either way.
+ */
+function locationsMatch(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return false;
+  return na.includes(nb) || nb.includes(na);
+}
+
 function getProvider(name: string): TrackingProvider | null {
   switch (name) {
     case "lufthansa":
@@ -105,8 +118,25 @@ export async function trackShipment(
           source:      providerName,
         }));
 
-        const latestEvent   = normalizedEvents.at(-1);
-        const currentStatus = latestEvent?.status ?? "UNKNOWN";
+        // Determine currentStatus from events that actually happened.
+        // ShipsGo (and others) include scheduled future events — using
+        // them for "current" status would lie to the user.
+        const now = new Date();
+        const pastEvents   = normalizedEvents.filter((e) => e.eventDate <= now);
+        const latestEvent  = pastEvents.at(-1) ?? normalizedEvents.at(0);
+        let currentStatus  = latestEvent?.status ?? "UNKNOWN";
+
+        // AT_PORT at any non-destination port is transshipment, not arrival.
+        // Without this, a container sitting at an intermediate port (e.g.
+        // Algeciras while routing Shanghai→Casablanca) shows as "Arrived".
+        if (
+          currentStatus === "AT_PORT" &&
+          result.destination &&
+          latestEvent?.location &&
+          !locationsMatch(latestEvent.location, result.destination)
+        ) {
+          currentStatus = "TRANSSHIPMENT";
+        }
 
         const trackingResult: TrackingResult = {
           trackingNumber:  normalized,
