@@ -5,6 +5,8 @@ import {
   getAirCarrier,
   normalizeContainerNumber,
   normalizeAWBNumber,
+  isValidAWBCheckDigit,
+  isValidContainerCheckDigit,
 } from "@/config/carriers";
 
 export interface ParsedIdentifier {
@@ -31,6 +33,27 @@ export function parseTrackingIdentifier(input: string): ParsedIdentifier {
   const type = detectIdentifierType(raw);
 
   if (type === "UNKNOWN") {
+    // Distinguish "wrong format" from "right format but invalid check digit".
+    // The latter is the most common cause of ShipsGo credit waste: users
+    // typing test/placeholder numbers like 176-12345678 (sequential), or
+    // a real number with one digit wrong. We catch both before the
+    // request ever reaches ShipsGo.
+    const cleanContainer = raw.trim().toUpperCase().replace(/[\s-]/g, "");
+    const looksLikeContainer = /^[A-Z]{4}\d{7}$/i.test(cleanContainer);
+    const looksLikeAWB       = /^\d{3}-?\d{8}$/.test(raw.trim());
+
+    if (looksLikeContainer && !isValidContainerCheckDigit(cleanContainer)) {
+      return invalid(
+        `Container number "${raw}" has an invalid check digit. ` +
+        `The last digit must match the ISO 6346 checksum — please verify the number is typed correctly.`
+      );
+    }
+    if (looksLikeAWB && !isValidAWBCheckDigit(raw.trim())) {
+      return invalid(
+        `AWB "${raw}" has an invalid check digit. ` +
+        `The last digit of the 8-digit serial must equal (first 7 digits) mod 7 — please verify the number.`
+      );
+    }
     return invalid(
       `"${raw}" doesn't match a known container number (e.g. MAEU1234567) ` +
       `or air waybill format (e.g. 157-12345678). Please check and try again.`

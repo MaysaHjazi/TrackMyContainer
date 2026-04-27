@@ -72,10 +72,64 @@ const CONTAINER_REGEX = /^[A-Z]{4}\d{7}$/i;
 /** AWB: optional 3-digit prefix + dash + 8 digits, or just 11 digits */
 const AWB_REGEX = /^(\d{3})-?(\d{8})$/;
 
+/**
+ * AWB check digit per IATA Resolution 600a: the 8th digit of the serial
+ * is `firstSeven mod 7`. Catches typos and obvious fakes (12345678,
+ * 99999999, etc.) BEFORE we burn a ShipsGo credit creating the shipment.
+ */
+export function isValidAWBCheckDigit(awb: string): boolean {
+  const m = awb.trim().replace(/\s/g, "").match(/^\d{3}-?(\d{7})(\d)$/);
+  if (!m) return false;
+  const serial = parseInt(m[1], 10);
+  const check  = parseInt(m[2], 10);
+  return serial % 7 === check;
+}
+
+/**
+ * ISO 6346 container check digit. Each letter has a numeric value
+ * (skipping multiples of 11 — A=10, B=12, ..., U=32, V=34, ...). Each
+ * character's value is multiplied by 2^position, summed, mod 11
+ * (10 collapses to 0). Catches typos and fake numbers (MSCU0000000,
+ * AAAA1111111, etc.) before they hit ShipsGo.
+ */
+const CONTAINER_LETTER_VALUE: Record<string, number> = {
+  A: 10, B: 12, C: 13, D: 14, E: 15, F: 16, G: 17, H: 18, I: 19, J: 20,
+  K: 21, L: 23, M: 24, N: 25, O: 26, P: 27, Q: 28, R: 29, S: 30, T: 31,
+  U: 32, V: 34, W: 35, X: 36, Y: 37, Z: 38,
+};
+
+export function isValidContainerCheckDigit(num: string): boolean {
+  const clean = num.trim().toUpperCase().replace(/[\s-]/g, "");
+  if (!CONTAINER_REGEX.test(clean)) return false;
+
+  const letters = clean.slice(0, 4);
+  const digits  = clean.slice(4, 10);
+  const check   = parseInt(clean[10], 10);
+  if (isNaN(check)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const v = CONTAINER_LETTER_VALUE[letters[i]];
+    if (v === undefined) return false;
+    sum += v * (1 << i);  // 2^i
+  }
+  for (let i = 0; i < 6; i++) {
+    sum += parseInt(digits[i], 10) * (1 << (i + 4));
+  }
+  const mod = sum % 11 % 10;
+  return mod === check;
+}
+
 export function detectIdentifierType(input: string): "SEA" | "AIR" | "UNKNOWN" {
   const clean = input.trim().toUpperCase().replace(/[\s-]/g, "");
-  if (CONTAINER_REGEX.test(clean)) return "SEA";
-  if (AWB_REGEX.test(input.trim())) return "AIR";
+  if (CONTAINER_REGEX.test(clean)) {
+    // Format match — but require valid check digit so we don't burn
+    // ShipsGo credits on typos and obviously-fake test numbers.
+    return isValidContainerCheckDigit(clean) ? "SEA" : "UNKNOWN";
+  }
+  if (AWB_REGEX.test(input.trim())) {
+    return isValidAWBCheckDigit(input.trim()) ? "AIR" : "UNKNOWN";
+  }
   return "UNKNOWN";
 }
 
