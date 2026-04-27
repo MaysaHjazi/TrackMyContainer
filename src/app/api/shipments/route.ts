@@ -134,13 +134,18 @@ export async function POST(req: NextRequest) {
       trackingProvider: provider,       // "jsoncargo" or "shipsgo"
       isLiveTracking,                   // false for FREE, true for PRO/CUSTOM
       trackingEvents: {
-        create: trackingData.events.map((e) => ({
-          status:      e.status,
-          location:    e.location,
-          description: e.description,
-          eventDate:   e.eventDate,
-          source:      e.source,
-        })),
+        // Only persist events that have actually happened. Future/predicted
+        // events (e.g. "estimated discharge on day X") can be cancelled or
+        // rescheduled — we add them day-by-day on subsequent polls.
+        create: trackingData.events
+          .filter((e) => e.eventDate <= new Date())
+          .map((e) => ({
+            status:      e.status,
+            location:    e.location,
+            description: e.description,
+            eventDate:   e.eventDate,
+            source:      e.source,
+          })),
       },
     },
     include: { trackingEvents: true },

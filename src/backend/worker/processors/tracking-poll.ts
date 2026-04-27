@@ -37,6 +37,12 @@ export async function trackingPollProcessor(
   const isArrivingSoon = result.etaDate && daysUntil(result.etaDate) <= 3 && daysUntil(result.etaDate) >= 0;
 
   // ── Persist new tracking events ──────────────────────────────
+  // Only persist events that have actually happened — providers like
+  // ShipsGo return predicted/scheduled future events (e.g. "estimated
+  // discharge on day X"), but those can be cancelled or rescheduled.
+  // We add events day-by-day as they actually occur on subsequent polls,
+  // matching the user's expectation of a real-time timeline.
+  const now = new Date();
   const existingEventDates = new Set(
     (await prisma.trackingEvent.findMany({
       where:  { shipmentId },
@@ -45,7 +51,9 @@ export async function trackingPollProcessor(
   );
 
   const newEvents = result.events.filter(
-    (e) => !existingEventDates.has(e.eventDate.toISOString()),
+    (e) =>
+      e.eventDate <= now &&
+      !existingEventDates.has(e.eventDate.toISOString()),
   );
 
   if (newEvents.length > 0) {
