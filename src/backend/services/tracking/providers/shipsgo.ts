@@ -76,26 +76,54 @@ export class ShipsgoProvider implements TrackingProvider {
 
   // ── OCEAN ──────────────────────────────────────────────────
   private async trackOcean(containerNumber: string): Promise<ProviderResult> {
+    let newlyCreatedId: number | null = null;
     try {
       const scac = containerNumber.slice(0, 4).toUpperCase();
 
       // Step 1: create or re-use shipment
-      const id = await this.createOrGetOceanShipment(containerNumber, scac);
-      if (!id) return this.fail(containerNumber, "Failed to create Shipsgo shipment");
+      const created = await this.createOrGetOceanShipment(containerNumber, scac);
+      if (!created) return this.fail(containerNumber, "Failed to create Shipsgo shipment");
+      if (created.wasCreated) newlyCreatedId = created.id;
 
       // Step 2: poll until ready or timeout
-      const shipment = await this.pollOcean(id);
-      if (!shipment) return this.fail(containerNumber, "Shipsgo shipment not found after creation");
+      const shipment = await this.pollOcean(created.id);
+      if (!shipment) {
+        if (newlyCreatedId) await this.deleteOceanShipment(newlyCreatedId);
+        return this.fail(containerNumber, "Shipsgo shipment not found after creation");
+      }
 
-      return this.parseOcean(containerNumber, shipment);
+      const result = this.parseOcean(containerNumber, shipment);
+
+      // If we just created the shipment but tracking failed, delete it so
+      // the credit isn't burned for nothing. Pre-existing shipments stay.
+      if (!result.success && newlyCreatedId) {
+        await this.deleteOceanShipment(newlyCreatedId);
+      }
+
+      return result;
     } catch (err) {
+      if (newlyCreatedId) await this.deleteOceanShipment(newlyCreatedId);
       const msg = err instanceof Error ? err.message : "Shipsgo request failed";
       console.error(`[shipsgo] Ocean error for ${containerNumber}:`, msg);
       return this.fail(containerNumber, msg);
     }
   }
 
-  private async createOrGetOceanShipment(containerNumber: string, scac: string): Promise<number | null> {
+  /** Delete a Shipsgo ocean shipment — used to recover credits after a failed track. */
+  private async deleteOceanShipment(id: number): Promise<void> {
+    try {
+      await fetch(`${this.baseUrl}/ocean/shipments/${id}`, {
+        method:  "DELETE",
+        headers: this.headers(),
+        signal:  AbortSignal.timeout(10_000),
+      });
+      console.log(`[shipsgo] Cleaned up untracked ocean shipment ${id} (credit recovery)`);
+    } catch (err) {
+      console.warn(`[shipsgo] Failed to delete ocean shipment ${id}:`, err);
+    }
+  }
+
+  private async createOrGetOceanShipment(containerNumber: string, scac: string): Promise<{ id: number; wasCreated: boolean } | null> {
     // ── Step 1: Search existing (FREE — no credits consumed) ──
     const listRes = await fetch(
       `${this.baseUrl}/ocean/shipments?container_number=${encodeURIComponent(containerNumber)}&limit=10`,
@@ -109,7 +137,7 @@ export class ShipsgoProvider implements TrackingProvider {
       );
       if (exact?.id) {
         console.log(`[shipsgo] Found existing shipment ${exact.id} for ${containerNumber}`);
-        return exact.id;
+        return { id: exact.id, wasCreated: false };
       }
     }
 
@@ -124,7 +152,7 @@ export class ShipsgoProvider implements TrackingProvider {
 
     if (createRes.ok) {
       const data = await createRes.json() as { shipment?: { id: number } };
-      if (data.shipment?.id) return data.shipment.id;
+      if (data.shipment?.id) return { id: data.shipment.id, wasCreated: true };
     }
 
     // Check if failure is due to insufficient credits
@@ -268,22 +296,52 @@ export class ShipsgoProvider implements TrackingProvider {
 
   // ── AIR ────────────────────────────────────────────────────
   private async trackAir(awbNumber: string): Promise<ProviderResult> {
+    let newlyCreatedId: number | null = null;
     try {
-      const id = await this.createOrGetAirShipment(awbNumber);
-      if (!id) return this.fail(awbNumber, "Failed to create Shipsgo air shipment");
+      const created = await this.createOrGetAirShipment(awbNumber);
+      if (!created) return this.fail(awbNumber, "Failed to create Shipsgo air shipment");
+      if (created.wasCreated) newlyCreatedId = created.id;
 
-      const shipment = await this.pollAir(id);
-      if (!shipment) return this.fail(awbNumber, "Shipsgo air shipment not found");
+      const shipment = await this.pollAir(created.id);
+      if (!shipment) {
+        if (newlyCreatedId) await this.deleteAirShipment(newlyCreatedId);
+        return this.fail(awbNumber, "Shipsgo air shipment not found");
+      }
 
-      return this.parseAir(awbNumber, shipment);
+      const result = this.parseAir(awbNumber, shipment);
+
+      // If we just created the shipment but tracking failed (invalid AWB,
+      // no data, etc.), delete it so the credit isn't burned for nothing.
+      // Pre-existing shipments are kept — deleting them would punish the
+      // user for trying to re-track something they already paid for.
+      if (!result.success && newlyCreatedId) {
+        await this.deleteAirShipment(newlyCreatedId);
+      }
+
+      return result;
     } catch (err) {
+      if (newlyCreatedId) await this.deleteAirShipment(newlyCreatedId);
       const msg = err instanceof Error ? err.message : "Shipsgo air request failed";
       console.error(`[shipsgo] Air error for ${awbNumber}:`, msg);
       return this.fail(awbNumber, msg);
     }
   }
 
-  private async createOrGetAirShipment(awbNumber: string): Promise<number | null> {
+  /** Delete a Shipsgo air shipment — used to recover credits after a failed track. */
+  private async deleteAirShipment(id: number): Promise<void> {
+    try {
+      await fetch(`${this.baseUrl}/air/shipments/${id}`, {
+        method:  "DELETE",
+        headers: this.headers(),
+        signal:  AbortSignal.timeout(10_000),
+      });
+      console.log(`[shipsgo] Cleaned up untracked air shipment ${id} (credit recovery)`);
+    } catch (err) {
+      console.warn(`[shipsgo] Failed to delete air shipment ${id}:`, err);
+    }
+  }
+
+  private async createOrGetAirShipment(awbNumber: string): Promise<{ id: number; wasCreated: boolean } | null> {
     // ── Step 1: Search existing (FREE — no credits consumed) ──
     const listRes = await fetch(
       `${this.baseUrl}/air/shipments?awb_number=${encodeURIComponent(awbNumber)}&limit=10`,
@@ -296,7 +354,7 @@ export class ShipsgoProvider implements TrackingProvider {
       );
       if (exact?.id) {
         console.log(`[shipsgo] Found existing air shipment ${exact.id} for ${awbNumber}`);
-        return exact.id;
+        return { id: exact.id, wasCreated: false };
       }
     }
 
@@ -310,7 +368,7 @@ export class ShipsgoProvider implements TrackingProvider {
     });
     if (createRes.ok) {
       const data = await createRes.json() as { shipment?: { id: number } };
-      if (data.shipment?.id) return data.shipment.id;
+      if (data.shipment?.id) return { id: data.shipment.id, wasCreated: true };
     }
 
     // Check for insufficient credits

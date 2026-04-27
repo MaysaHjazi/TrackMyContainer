@@ -187,7 +187,7 @@ export async function trackShipment(
   const hint =
     type === "SEA"
       ? "Container not found in any carrier database. Verify the number is typed correctly — it may also be too new for the carrier to report yet."
-      : "Only LH (020-) and QR (157-) AWBs are currently supported.";
+      : "AWB not found. Verify the number is typed correctly (3-digit airline prefix + 8-digit serial, e.g. 176-12345678) — it may also be too new for the airline to report yet.";
 
   throw new TrackingError(
     `No tracking data for ${normalized}. ${hint}`,
