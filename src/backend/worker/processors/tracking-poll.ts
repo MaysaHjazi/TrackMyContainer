@@ -97,72 +97,110 @@ export async function trackingPollProcessor(
   });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://trackmycontainer.info";
-  const trackUrl = `${appUrl}/track/${encodeURIComponent(trackingNumber)}`;
+  const trackUrl = `${appUrl}/dashboard/shipments/${shipmentId}`;
 
   const user = shipment.user;
-  if (!user?.subscription?.whatsappEnabled || !user?.whatsappOptIn || !user?.phone) {
-    return; // No WhatsApp notifications configured
+  if (!user) return;
+
+  // ── Capability gates ─────────────────────────────────────────
+  // Email is enabled per-shipment via shipment.notifyEmail (defaults true).
+  // WhatsApp also requires the user to opt in and have whatsappEnabled
+  // set on their subscription, plus a phone number on file.
+  const emailEnabled =
+    shipment.notifyEmail && !!user.email;
+  const whatsappEnabled =
+    shipment.notifyWhatsapp &&
+    !!user.subscription?.whatsappEnabled &&
+    !!user.whatsappOptIn &&
+    !!user.phone;
+
+  if (!emailEnabled && !whatsappEnabled) return;
+
+  // ── ARRIVAL NOTICE ──────────────────────────────────────────
+  if (newlyDelivered) {
+    const payloadBase = {
+      name:      user.name ?? "there",
+      number:    trackingNumber,
+      location:  result.currentLocation ?? "destination",
+      arrivedAt: (result.etaDate ?? new Date()).toISOString(),
+      url:       trackUrl,
+    };
+
+    if (whatsappEnabled) {
+      await notificationQueue.add("arrival-notice", {
+        userId, shipmentId,
+        channel: "WHATSAPP", type: "ARRIVAL_NOTICE",
+        payload: { ...payloadBase, phone: user.phone! },
+      });
+    }
+    if (emailEnabled) {
+      await notificationQueue.add("arrival-notice-email", {
+        userId, shipmentId,
+        channel: "EMAIL", type: "ARRIVAL_NOTICE",
+        payload: { ...payloadBase, email: user.email },
+      });
+    }
   }
 
-  // ── Enqueue notifications ─────────────────────────────────────
-  if (newlyDelivered && shipment.notifyWhatsapp) {
-    await notificationQueue.add("arrival-notice", {
-      userId,
-      shipmentId,
-      channel:  "WHATSAPP",
-      type:     "ARRIVAL_NOTICE",
-      payload: {
-        phone:     user.phone,
-        name:      user.name ?? "there",
-        number:    trackingNumber,
-        location:  result.currentLocation ?? "destination",
-        arrivedAt: result.etaDate ?? new Date(),
-        url:       trackUrl,
-      },
-    });
+  // ── DELAY ALERT ─────────────────────────────────────────────
+  if (newlyDelayed) {
+    const payloadBase = {
+      name:     user.name ?? "there",
+      number:   trackingNumber,
+      newEta:   (result.etaDate ?? new Date()).toISOString(),
+      location: result.currentLocation,
+      url:      trackUrl,
+    };
+
+    if (whatsappEnabled) {
+      await notificationQueue.add("delay-alert", {
+        userId, shipmentId,
+        channel: "WHATSAPP", type: "DELAY_ALERT",
+        payload: { ...payloadBase, phone: user.phone! },
+      });
+    }
+    if (emailEnabled) {
+      await notificationQueue.add("delay-alert-email", {
+        userId, shipmentId,
+        channel: "EMAIL", type: "DELAY_ALERT",
+        payload: { ...payloadBase, email: user.email },
+      });
+    }
   }
 
-  if (newlyDelayed && shipment.notifyWhatsapp) {
-    await notificationQueue.add("delay-alert", {
-      userId,
-      shipmentId,
-      channel:  "WHATSAPP",
-      type:     "DELAY_ALERT",
-      payload: {
-        phone:  user.phone,
-        name:   user.name ?? "there",
-        number: trackingNumber,
-        newEta: result.etaDate ?? new Date(),
-        url:    trackUrl,
-      },
-    });
-  }
-
-  if (isArrivingSoon && !newlyDelivered && shipment.notifyWhatsapp) {
-    // Check if we already sent an ETA_IMMINENT for this shipment recently (avoid spam)
+  // ── ETA IMMINENT (≤ 3 days) — dedupe across channels per 24h ──
+  if (isArrivingSoon && !newlyDelivered) {
     const recentAlert = await prisma.notification.findFirst({
       where: {
         shipmentId,
-        type:     "ETA_IMMINENT",
-        sentAt:   { gte: new Date(Date.now() - 24 * 3600 * 1000) },
-        status:   { in: ["SENT", "DELIVERED"] },
+        type:   "ETA_IMMINENT",
+        sentAt: { gte: new Date(Date.now() - 24 * 3600 * 1000) },
+        status: { in: ["SENT", "DELIVERED"] },
       },
     });
 
     if (!recentAlert) {
-      await notificationQueue.add("eta-imminent", {
-        userId,
-        shipmentId,
-        channel: "WHATSAPP",
-        type:    "ETA_IMMINENT",
-        payload: {
-          phone:   user.phone,
-          name:    user.name ?? "there",
-          number:  trackingNumber,
-          etaDate: result.etaDate ?? new Date(),
-          url:     trackUrl,
-        },
-      });
+      const payloadBase = {
+        name:    user.name ?? "there",
+        number:  trackingNumber,
+        etaDate: (result.etaDate ?? new Date()).toISOString(),
+        url:     trackUrl,
+      };
+
+      if (whatsappEnabled) {
+        await notificationQueue.add("eta-imminent", {
+          userId, shipmentId,
+          channel: "WHATSAPP", type: "ETA_IMMINENT",
+          payload: { ...payloadBase, phone: user.phone! },
+        });
+      }
+      if (emailEnabled) {
+        await notificationQueue.add("eta-imminent-email", {
+          userId, shipmentId,
+          channel: "EMAIL", type: "ETA_IMMINENT",
+          payload: { ...payloadBase, email: user.email },
+        });
+      }
     }
   }
 }
