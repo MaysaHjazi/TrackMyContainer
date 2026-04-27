@@ -216,6 +216,34 @@ export class ShipsgoProvider implements TrackingProvider {
       );
     }
 
+    // ── Derive ATD / ATA from past events ─────────────────────
+    // ATD = the first DEPA (Vessel departed) event from the origin port.
+    // ATA = the first ARRV (Vessel arrived) event AT the destination port.
+    // Only past events count — predicted future departures/arrivals stay
+    // in `events` for context but never become "actual".
+    const now = Date.now();
+    const originName = route?.port_of_loading?.location?.name ?? "";
+    const destName   = route?.port_of_discharge?.location?.name ?? "";
+    const norm       = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+    const matches    = (a: string, b: string) => {
+      const na = norm(a); const nb = norm(b);
+      return !!na && !!nb && (na.includes(nb) || nb.includes(na));
+    };
+
+    const atdEvent = events.find(
+      (e) =>
+        e.rawStatus === "DEPA" &&
+        e.timestamp.getTime() <= now &&
+        (!originName || matches(e.location, originName)),
+    );
+    const ataEvent = events.find(
+      (e) =>
+        e.rawStatus === "ARRV" &&
+        e.timestamp.getTime() <= now &&
+        !!destName &&
+        matches(e.location, destName),
+    );
+
     return {
       success:        true,
       provider:       this.name,
@@ -228,8 +256,10 @@ export class ShipsgoProvider implements TrackingProvider {
       etd:            route?.port_of_loading?.date_of_loading
                        ? new Date(route.port_of_loading.date_of_loading)
                        : undefined,
-      origin:         route?.port_of_loading?.location?.name ?? "",
-      destination:    route?.port_of_discharge?.location?.name ?? "",
+      atd:            atdEvent?.timestamp,
+      ata:            ataEvent?.timestamp,
+      origin:         originName,
+      destination:    destName,
       vessel:         transport?.vessel?.name ?? "",
       voyage:         transport?.voyage ?? "",
       rawData:        shipment,

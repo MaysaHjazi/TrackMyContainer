@@ -279,6 +279,7 @@ export default async function ShipmentDetailPage({
             type={shipment.type}
             currentStatus={shipment.currentStatus}
             atdDate={shipment.atdDate}
+            etdDate={shipment.etdDate}
             etaDate={shipment.etaDate}
             ataDate={shipment.ataDate}
           />

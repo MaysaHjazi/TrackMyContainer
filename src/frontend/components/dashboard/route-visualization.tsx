@@ -27,6 +27,7 @@ interface Props {
   type:           ShipmentType;
   currentStatus:  ShipmentStatus;
   atdDate?:       Date | null;
+  etdDate?:       Date | null;
   etaDate?:       Date | null;
   ataDate?:       Date | null;
 }
@@ -66,22 +67,32 @@ function statusMeta(status: ShipmentStatus): {
   }
 }
 
-/** Fraction of journey [0, 1] from ATD→ETA. */
+/** Fraction of journey [0, 1] from departure → ETA. */
 function calcProgress(
   status: ShipmentStatus,
   atd:    Date | null | undefined,
+  etd:    Date | null | undefined,
   eta:    Date | null | undefined,
   ata:    Date | null | undefined,
 ): number {
-  if (ata || status === "DELIVERED" || status === "AT_PORT" || status === "OUT_FOR_DELIVERY") return 1;
-  if (!atd) return 0;
-  if (!eta) return 0.15;
-  const now   = Date.now();
-  const start = atd.getTime();
-  const end   = eta.getTime();
+  // Already arrived at destination
+  if (ata || status === "DELIVERED") return 1;
+
+  // AT_PORT only means "arrived" if there's also an ata. Without ata,
+  // the container is just at some port (intermediate) — keep moving.
+  if ((status === "AT_PORT" || status === "OUT_FOR_DELIVERY") && ata) return 1;
+
+  // Prefer actual departure (atd); fall back to estimated (etd) when the
+  // provider didn't supply atd but the journey has clearly started (e.g.
+  // status is in transit / transshipment).
+  const start = atd?.getTime() ?? etd?.getTime();
+  if (!start) return 0;
+  if (!eta)   return 0.15;
+
+  const now = Date.now();
   if (now <= start) return 0;
-  if (now >= end)   return 0.92;
-  return (now - start) / (end - start);
+  if (now >= eta.getTime()) return 0.92;
+  return (now - start) / (eta.getTime() - start);
 }
 
 // Styles injected once per component instance. Using dangerouslySetInnerHTML
@@ -161,7 +172,7 @@ const ROUTE_STYLES = `
 
 export function RouteVisualization({
   origin, destination, type, currentStatus,
-  atdDate, etaDate, ataDate,
+  atdDate, etdDate, etaDate, ataDate,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const pathRef = useRef<SVGPathElement>(null);
@@ -171,12 +182,13 @@ export function RouteVisualization({
 
   // Stable primitive keys so the effect doesn't re-run on every parent render.
   const atdKey = atdDate ? atdDate.getTime() : null;
+  const etdKey = etdDate ? etdDate.getTime() : null;
   const etaKey = etaDate ? etaDate.getTime() : null;
   const ataKey = ataDate ? ataDate.getTime() : null;
 
   useEffect(() => {
     if (!mounted || !pathRef.current) return;
-    const progress = calcProgress(currentStatus, atdDate, etaDate, ataDate);
+    const progress = calcProgress(currentStatus, atdDate, etdDate, etaDate, ataDate);
     const path = pathRef.current;
     const total = path.getTotalLength();
     const traveled = total * progress;
@@ -185,7 +197,7 @@ export function RouteVisualization({
     const rot = Math.atan2(pAhead.y - p.y, pAhead.x - p.x) * (180 / Math.PI);
     setVessel({ x: p.x, y: p.y, rot, traveled, total });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, currentStatus, atdKey, etaKey, ataKey]);
+  }, [mounted, currentStatus, atdKey, etdKey, etaKey, ataKey]);
 
   const meta = statusMeta(currentStatus);
   const StatusIcon = meta.icon;
