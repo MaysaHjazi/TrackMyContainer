@@ -45,13 +45,17 @@ export const subscriptionCheckQueue = new Queue("subscription-check", defaultQue
 
 export const DISPATCHER_SCHEDULER_ID = "tracking-dispatcher-recurring";
 export const DISPATCHER_JOB_NAME = "dispatch-polls";
-export const DISPATCHER_REPEAT_EVERY_MS = 6 * 60 * 60 * 1000; // 6 hours
+// Poll every 30 minutes. ShipsGo's GET endpoint for existing shipments
+// is FREE (only POST/create costs credits), so we can refresh much
+// more often than the original 6h budget set when JsonCargo (rate-
+// limited) was the only provider.
+export const DISPATCHER_REPEAT_EVERY_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Register the repeating dispatcher job. Safe to call on every worker
  * startup — `upsertJobScheduler` replaces any existing schedule under the
  * same id, so we never duplicate the recurring entry. Also triggers one
- * immediate dispatch so a fresh worker boot polls without waiting 6 hours.
+ * immediate dispatch so a fresh worker boot polls without waiting.
  */
 export async function scheduleTrackingDispatcher(): Promise<void> {
   await trackingDispatcherQueue.upsertJobScheduler(

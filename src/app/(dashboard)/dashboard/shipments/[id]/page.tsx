@@ -32,6 +32,13 @@ import { ShipmentActions } from "./shipment-actions";
 import { RouteMap } from "@/frontend/components/dashboard/route-map";
 import { RouteVisualization } from "@/frontend/components/dashboard/route-visualization";
 import { FreeShipmentSummary } from "@/frontend/components/dashboard/free-shipment-summary";
+import { LiveEtaCountdown } from "@/frontend/components/dashboard/live-eta-countdown";
+import { AutoRefresh } from "@/frontend/components/dashboard/auto-refresh";
+
+// Refresh server-rendered data every 60 seconds so live tracking
+// updates (worker polls every 30 min, ShipsGo webhooks fire instantly)
+// surface in the UI without a manual refresh.
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -177,6 +184,9 @@ export default async function ShipmentDetailPage({
 
   return (
     <div className="flex h-full">
+      {/* Quietly re-fetches server data every 60s — keeps live status,
+          ETA, events and map in sync with worker polls + webhooks. */}
+      <AutoRefresh intervalMs={60_000} />
       {/* ── Left: Main content ───────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Back */}
@@ -479,7 +489,7 @@ export default async function ShipmentDetailPage({
       <aside className="hidden w-72 flex-shrink-0 border-l border-navy-200 bg-white dark:border-navy-800 dark:bg-navy-950 lg:flex lg:flex-col overflow-y-auto">
         <div className="p-5 space-y-5">
           {/* ETA Countdown */}
-          <EtaCountdown etaDate={shipment.etaDate} status={shipment.currentStatus} />
+          <LiveEtaCountdown etaDate={shipment.etaDate} status={shipment.currentStatus} />
 
           {/* Actions */}
           <ShipmentActions

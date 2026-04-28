@@ -74,9 +74,9 @@ notificationWorker.on("failed", (job, err) => {
   console.error(`[notification-send] ❌ Job ${job?.id} failed:`, err.message);
 });
 
-// ── Schedule the recurring dispatcher (runs every 6h) ─────────
+// ── Schedule the recurring dispatcher (runs every 30 min) ─────
 scheduleTrackingDispatcher()
-  .then(() => console.log("[Worker] Tracking dispatcher scheduled every 6 hours"))
+  .then(() => console.log("[Worker] Tracking dispatcher scheduled every 30 minutes"))
   .catch((err) => console.error("[Worker] Failed to schedule dispatcher:", err));
 
 // ── Graceful shutdown ─────────────────────────────────────────
