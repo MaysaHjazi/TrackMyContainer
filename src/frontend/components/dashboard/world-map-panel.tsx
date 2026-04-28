@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Ship, Plane, X, ZoomIn, ZoomOut, Maximize2, MapPin, ArrowRight } from "lucide-react";
 import type { ShipmentStatus, ShipmentType } from "@prisma/client";
 import { useTheme } from "@/frontend/theme-provider";
+import { getCoordinates } from "@/lib/port-coordinates";
 
 /* ── World topology URL (Natural Earth 110m) ── */
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -36,17 +37,13 @@ interface Props {
   shipments: ShipmentDot[];
 }
 
-/* ── Trade route arcs ── */
-const TRADE_ROUTES: { from: [number, number]; to: [number, number]; type: "SEA" | "AIR" }[] = [
-  { from: [121.5, 31.2], to: [4.5, 51.9], type: "SEA" },
-  { from: [103.8, 1.3], to: [55.3, 25.3], type: "SEA" },
-  { from: [129.0, 35.1], to: [-118.2, 33.9], type: "SEA" },
-  { from: [4.5, 51.9], to: [-74.0, 40.7], type: "SEA" },
-  { from: [121.5, 31.2], to: [-118.2, 33.9], type: "SEA" },
-  { from: [55.3, 25.3], to: [-0.1, 51.5], type: "AIR" },
-  { from: [8.6, 50.0], to: [121.5, 31.2], type: "AIR" },
-  { from: [51.5, 25.3], to: [151.2, -33.9], type: "AIR" },
-];
+/** Convert location string → [lng, lat] tuple, or null if unknown. */
+function toLngLat(loc: string | null | undefined): [number, number] | null {
+  if (!loc) return null;
+  const { lat, lng } = getCoordinates(loc);
+  if (lat === 0 && lng === 0) return null;
+  return [lng, lat];
+}
 
 /* ── Major port markers ── */
 const PORTS: { name: string; coords: [number, number] }[] = [
@@ -75,46 +72,18 @@ function getStatusText(status: ShipmentStatus): string {
   return map[status] ?? status.replace(/_/g, " ");
 }
 
-/* ── Theme-aware color schemes ──────────────────────────────────
- * Dark mode: deep navy ocean, neon teal/orange accents — matches
- *            the rest of the dashboard's dark theme.
- * Light mode: soft sky-blue ocean, slate land, teal/orange accents —
- *             pulls from the same tokens used elsewhere in the
- *             dashboard's light cards (slate-200/400, teal-600,
- *             orange-500, navy-900) so the map stops feeling like
- *             a foreign element on a white page.
+/* Map colours live in globals.css under `.world-map-panel` and
+ * `.dark .world-map-panel` — CSS variables flip the moment the dark
+ * class toggles on <html>, which is what the View Transitions API
+ * captures. Doing this in JS would race the snapshot.
+ *
+ * The only thing we still derive in JS is the panel background — it's
+ * a multi-stop gradient, easier as inline style and theme-keyed below.
  */
-const COLORS = {
-  dark: {
-    bg: "linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%)",
-    land:       "#132044",
-    landHover:  "#1A2D5E",
-    border:     "#1E3468",
-    gridColor:  "rgba(0,180,196,0.4)",
-    gridOpacity:"0.06",
-    seaRoute:   "rgba(0,180,196,0.35)",
-    airRoute:   "rgba(245,130,31,0.35)",
-    portDot:    "#00B4C4",
-    portLabel:  "rgba(0,180,196,0.7)",
-    labelText:  "rgba(255,255,255,0.85)",
-    dotStroke:  "rgba(255,255,255,0.6)",
-  },
-  light: {
-    // Soft sky-blue gradient — ocean, not deep space
-    bg:         "linear-gradient(180deg, #F1F5F9 0%, #E0F2FE 50%, #DBEAFE 100%)",
-    land:       "#E2E8F0",  // slate-200 — clearly distinct from ocean
-    landHover:  "#CBD5E1",  // slate-300
-    border:     "#94A3B8",  // slate-400 — visible country outlines
-    gridColor:  "rgba(14,116,144,0.35)",  // teal-700 grid
-    gridOpacity:"0.10",
-    seaRoute:   "rgba(14,116,144,0.55)",  // teal-700 dashes (sea)
-    airRoute:   "rgba(234,88,12,0.55)",   // orange-600 dashes (air)
-    portDot:    "#0891B2",  // teal-600
-    portLabel:  "rgba(14,116,144,0.85)",  // teal-700
-    labelText:  "rgba(30,41,59,0.85)",    // slate-800
-    dotStroke:  "rgba(255,255,255,0.95)", // bright outline so dots pop on light land
-  },
-};
+const PANEL_BG = {
+  dark:  "linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%)",
+  light: "linear-gradient(180deg, #FAFCFF 0%, #F1F6FC 50%, #E9F1FA 100%)",
+} as const;
 
 export function WorldMapPanel({ shipments }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -126,7 +95,7 @@ export function WorldMapPanel({ shipments }: Props) {
   const { theme } = useTheme();
 
   useEffect(() => { setMounted(true); }, []);
-  const c = theme === "dark" ? COLORS.dark : COLORS.light;
+  const panelBg = theme === "dark" ? PANEL_BG.dark : PANEL_BG.light;
 
   const handleZoomIn = useCallback(() => {
     setPosition((pos) => ({ ...pos, zoom: Math.min(pos.zoom * 1.5, 8) }));
@@ -155,21 +124,13 @@ export function WorldMapPanel({ shipments }: Props) {
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden flex items-center justify-center"
+      className="world-map-panel relative w-full h-full overflow-hidden flex items-center justify-center"
       style={{
-        background: c.bg,
+        background: panelBg,
       }}
     >
-      {/* ── Grid overlay ── */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          opacity: c.gridOpacity,
-          backgroundImage:
-            `linear-gradient(${c.gridColor} 1px, transparent 1px), linear-gradient(90deg, ${c.gridColor} 1px, transparent 1px)`,
-          backgroundSize: "60px 60px",
-        }}
-      />
+      {/* Grid removed by design — keep the map clean and let the shipment
+          dots and routes be the only visual rhythm on the canvas. */}
 
       {/* ── Map with Zoom & Pan ── */}
       <ComposableMap
@@ -192,12 +153,12 @@ export function WorldMapPanel({ shipments }: Props) {
                 <Geography
                   key={geo.rpiD || geo.properties?.name || Math.random()}
                   geography={geo}
-                  fill={c.land}
-                  stroke={c.border}
+                  fill="var(--wm-land)"
+                  stroke="var(--wm-border)"
                   strokeWidth={0.5 / position.zoom}
                   style={{
                     default: { outline: "none" },
-                    hover: { fill: c.landHover, outline: "none", cursor: "grab" },
+                    hover:   { fill: "var(--wm-land-hover)", outline: "none", cursor: "grab" },
                     pressed: { outline: "none", cursor: "grabbing" },
                   }}
                 />
@@ -205,24 +166,36 @@ export function WorldMapPanel({ shipments }: Props) {
             }
           </Geographies>
 
-          {/* ── Trade route arcs — client-only to avoid SSR/CSR float mismatch ── */}
-          {mounted && TRADE_ROUTES.map((route, i) => (
-            <Line
-              key={`route-${i}`}
-              from={route.from}
-              to={route.to}
-              stroke={route.type === "SEA" ? c.seaRoute : c.airRoute}
-              strokeWidth={1.5 / position.zoom}
-              strokeLinecap="round"
-              strokeDasharray="8 4"
-            />
-          ))}
+          {/* ── Real shipment routes (origin → destination) ─────────
+              ONE line per active shipment that has both an origin and a
+              destination we can geocode. Sea = teal dashes, Air = orange
+              dashes. No decorative/random arcs — only what's actually
+              moving in your account. */}
+          {mounted &&
+            shipments
+              .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+              .map((s) => {
+                const from = toLngLat(s.origin);
+                const to   = toLngLat(s.destination);
+                if (!from || !to) return null;
+                return (
+                  <Line
+                    key={`route-${s.id}`}
+                    from={from}
+                    to={to}
+                    stroke={s.type === "SEA" ? "var(--wm-sea-route)" : "var(--wm-air-route)"}
+                    strokeWidth={1.5 / position.zoom}
+                    strokeLinecap="round"
+                    strokeDasharray="8 4"
+                  />
+                );
+              })}
 
           {/* ── Port markers with labels at higher zoom ── */}
           {PORTS.map((port) => (
             <Marker key={port.name} coordinates={port.coords}>
-              <circle r={3 * dotScale} fill={c.portDot} opacity={0.2} />
-              <circle r={1.5 * dotScale} fill={c.portDot} opacity={0.8} />
+              <circle r={3 * dotScale} fill="var(--wm-port-dot)" opacity={0.2} />
+              <circle r={1.5 * dotScale} fill="var(--wm-port-dot)" opacity={0.8} />
               {/* Show port name when zoomed in */}
               {position.zoom >= 2 && (
                 <text
@@ -230,8 +203,8 @@ export function WorldMapPanel({ shipments }: Props) {
                   y={-6 * dotScale}
                   style={{
                     fontFamily: "Inter, sans-serif",
-                    fontSize: `${8 * dotScale}px`,
-                    fill: c.portLabel,
+                    fontSize:   `${8 * dotScale}px`,
+                    fill:       "var(--wm-port-label)",
                     fontWeight: 600,
                   }}
                 >
@@ -305,11 +278,11 @@ export function WorldMapPanel({ shipments }: Props) {
                 <circle
                   r={6 * dotScale}
                   fill={dotColor}
-                  stroke={c.dotStroke}
+                  stroke="var(--wm-dot-stroke)"
                   strokeWidth={2 * dotScale}
                 />
 
-                {/* Carrier label when zoomed in — uses theme-aware text colour */}
+                {/* Carrier label when zoomed in — CSS-driven text colour */}
                 {position.zoom >= 3 && (
                   <text
                     textAnchor="start"
@@ -317,8 +290,8 @@ export function WorldMapPanel({ shipments }: Props) {
                     y={3 * dotScale}
                     style={{
                       fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: `${7 * dotScale}px`,
-                      fill: c.labelText,
+                      fontSize:   `${7 * dotScale}px`,
+                      fill:       "var(--wm-label-text)",
                       fontWeight: 700,
                     }}
                   >

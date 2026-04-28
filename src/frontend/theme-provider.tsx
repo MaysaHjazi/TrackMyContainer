@@ -48,12 +48,45 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    applyTheme(next);
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* ignore */
+    }
+
+    if (typeof document === "undefined") {
+      setThemeState(next);
+      applyTheme(next);
+      return;
+    }
+
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Light-touch crossfade approach (no full-page snapshot freeze):
+    //   1. Add a transient `.theme-switching` class on <html>.
+    //   2. CSS rule for that class enables ~180ms color/fill/stroke
+    //      transitions on every element.
+    //   3. Flip the dark class. CSS variables (map land, borders,
+    //      routes, body bg, card bg, text…) interpolate smoothly
+    //      between their old and new values.
+    //   4. After 220ms, drop the `.theme-switching` class so normal
+    //      hover/state transitions stay snappy.
+    //
+    // No setTimeout throttling, no React render race, and the map
+    // animates because its colours all live in CSS variables.
+    const root = document.documentElement;
+    if (!reducedMotion) root.classList.add("theme-switching");
+
+    setThemeState(next);
+    applyTheme(next);
+
+    if (!reducedMotion) {
+      window.setTimeout(() => {
+        root.classList.remove("theme-switching");
+      }, 220);
     }
   }, []);
 

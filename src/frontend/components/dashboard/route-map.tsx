@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ComposableMap, Geographies, Geography, Marker, Line } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { Navigation, Ship } from "lucide-react";
 import { getCoordinates } from "@/lib/port-coordinates";
 import { useTheme } from "@/frontend/theme-provider";
@@ -63,24 +63,22 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
     );
   }
 
-  // Theme-specific palette
+  // Container/header chrome stays Tailwind class-based (the .dark
+  // selector picks up the right tokens at the cascade level). Land
+  // and stroke colours move to CSS variables in globals.css under
+  // `.route-map` / `.dark .route-map` so SVG repaints the instant
+  // the dark class flips on <html> — same trick as the world map.
   const palette = isDark
     ? {
         container:  "bg-navy-950 border-navy-800",
         headerBg:   "border-navy-800 bg-navy-900/50",
         headerText: "text-navy-200",
-        landFill:   "#1e3a5f",   // deep blue
-        landStroke: "#2a4d7a",
-        ocean:      "transparent",
         legendBg:   "border-navy-800 bg-navy-900/50 text-navy-400",
       }
     : {
         container:  "bg-white border-navy-200",
         headerBg:   "border-navy-100 bg-navy-50/60",
         headerText: "text-navy-700",
-        landFill:   "#E6EAF2",   // soft grey-blue
-        landStroke: "#C9D1E0",
-        ocean:      "transparent",
         legendBg:   "border-navy-100 bg-navy-50/60 text-navy-500",
       };
 
@@ -98,7 +96,7 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
   const scale   = Math.max(110, Math.min(220, 8000 / span));
 
   return (
-    <div className={`rounded-xl border overflow-hidden shadow-sm ${palette.container}`}>
+    <div className={`route-map rounded-xl border overflow-hidden shadow-sm ${palette.container}`}>
       {/* Header */}
       <div className={`flex items-center gap-2 px-4 py-2 border-b ${palette.headerBg}`}>
         <Navigation size={14} className="text-orange-500 dark:text-orange-400" />
@@ -119,7 +117,7 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
         projectionConfig={{ scale, center }}
         width={500}
         height={280}
-        style={{ width: "100%", height: "auto", background: palette.ocean }}
+        style={{ width: "100%", height: "auto", background: "transparent" }}
       >
         <Geographies geography={GEO_URL}>
           {({ geographies }) =>
@@ -127,48 +125,18 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
-                fill={palette.landFill}
-                stroke={palette.landStroke}
+                fill="var(--rm-land)"
+                stroke="var(--rm-border)"
                 strokeWidth={0.4}
               />
             ))
           }
         </Geographies>
 
-        {/* ── Traveled leg: origin → current (solid orange) ── */}
-        {originCoords && currentCoords && (
-          <Line
-            from={originCoords}
-            to={currentCoords}
-            stroke={CURRENT_C}
-            strokeWidth={2}
-            strokeLinecap="round"
-          />
-        )}
-
-        {/* ── Remaining leg: current → destination (dashed green) ── */}
-        {currentCoords && destCoords && (
-          <Line
-            from={currentCoords}
-            to={destCoords}
-            stroke={DEST_C}
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            strokeLinecap="round"
-          />
-        )}
-
-        {/* Fallback: no current → straight line origin → destination */}
-        {!currentCoords && originCoords && destCoords && (
-          <Line
-            from={originCoords}
-            to={destCoords}
-            stroke={CURRENT_C}
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            strokeLinecap="round"
-          />
-        )}
+        {/* Route lines removed — by design they live on the dashboard
+            world map (where they aggregate every active shipment). The
+            sidebar map keeps things minimal: just the origin / current /
+            destination markers, no connecting line. */}
 
         {/* ── Origin marker ── */}
         {originCoords && (

@@ -195,3 +195,83 @@
 
 .dark ::-webkit-scrollbar-thumb { @apply bg-navy-700; }
 .dark ::-webkit-scrollbar-thumb:hover { @apply bg-navy-600; }
+
+/* ── Theme switch animation ──────────────────────────────
+ * View Transitions API (Chrome 111+, Edge, Safari 18+).
+ * Old frame fades out, then new frame fades in — matches the
+ * "اختفاء وبعدها يظهر شوي شوي" flow the user asked for.
+ * Older browsers fall back to a JS opacity fade in theme-provider.
+ */
+/* Smooth crossfade on theme toggle — no full-page snapshot freeze.
+ *
+ * Strategy: theme-provider adds `.theme-switching` to <html> for
+ * ~220ms while flipping the `.dark` class. During that window every
+ * element interpolates color-related properties between the old and
+ * new theme. CSS variables (map tokens, body bg, card surfaces) flip
+ * instantly under the hood, but the visible paint smoothly tweens.
+ *
+ * Outside this window there are NO transitions on these properties,
+ * so hover states, focus rings, and other quick state changes stay
+ * snappy at their normal sub-100ms feel. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    background-color   180ms ease-out,
+    background-image   180ms ease-out,
+    color              180ms ease-out,
+    border-color       180ms ease-out,
+    fill               180ms ease-out,
+    stroke             180ms ease-out,
+    box-shadow         180ms ease-out !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-switching,
+  html.theme-switching * {
+    transition: none !important;
+  }
+}
+
+/* ── Map colour tokens (CSS-driven, instant theme switch) ──────
+ * The world map and the small route map render their land/borders
+ * /routes via SVG `fill` and `stroke` attributes. JS-side palette
+ * lookups don't repaint until React re-renders, which races the
+ * View Transitions snapshot. CSS variables flip the moment the
+ * `.dark` class toggles on <html> — pixel-accurate crossfade.
+ */
+
+/* World dashboard map (light defaults) */
+.world-map-panel {
+  --wm-land:        #DCE7F4;
+  --wm-land-hover:  #CBDAEE;
+  --wm-border:      #B5C5DC;
+  --wm-sea-route:   #14B8A6;
+  --wm-air-route:   #F97316;
+  --wm-port-dot:    #1E40AF;
+  --wm-port-label:  rgba(30,64,175,0.85);
+  --wm-label-text:  rgba(15,23,42,0.85);
+  --wm-dot-stroke:  #FFFFFF;
+}
+.dark .world-map-panel {
+  --wm-land:        #132044;
+  --wm-land-hover:  #1A2D5E;
+  --wm-border:      #1E3468;
+  --wm-sea-route:   rgba(0,180,196,0.55);
+  --wm-air-route:   rgba(245,130,31,0.55);
+  --wm-port-dot:    #00B4C4;
+  --wm-port-label:  rgba(0,180,196,0.70);
+  --wm-label-text:  rgba(255,255,255,0.85);
+  --wm-dot-stroke:  rgba(255,255,255,0.60);
+}
+
+/* Sidebar route map (light defaults) */
+.route-map {
+  --rm-land:    #DCE7F4;
+  --rm-border:  #B5C5DC;
+}
+.dark .route-map {
+  --rm-land:    #1E3A5F;
+  --rm-border:  #2A4D7A;
+}
