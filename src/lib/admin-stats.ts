@@ -93,17 +93,25 @@ export async function getPendingContactRequests() {
 
 // ── API calls per day (last 7 days) ─────────────────────────
 export async function getApiCallsByDay(): Promise<Array<{ day: string; count: number }>> {
-  const buckets: Array<{ day: string; count: number }> = [];
-  for (let offset = 6; offset >= 0; offset--) {
+  const ranges = Array.from({ length: 7 }, (_, i) => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - offset);
+    start.setDate(start.getDate() - (6 - i));
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
-    const count = await prisma.trackingQuery.count({
-      where: { createdAt: { gte: start, lt: end } },
-    });
-    buckets.push({ day: start.toISOString().slice(0, 10), count });
-  }
-  return buckets;
+    return { start, end };
+  });
+
+  const counts = await Promise.all(
+    ranges.map((r) =>
+      prisma.trackingQuery.count({
+        where: { createdAt: { gte: r.start, lt: r.end } },
+      }),
+    ),
+  );
+
+  return ranges.map((r, i) => ({
+    day:   r.start.toISOString().slice(0, 10),
+    count: counts[i],
+  }));
 }
