@@ -1,5 +1,11 @@
--- Add role column to users (TEXT — same approach as the subscription migration)
-ALTER TABLE "users" ADD COLUMN "role" TEXT NOT NULL DEFAULT 'USER';
+-- Postgres ENUM type for User.role — Prisma's `UserRole` enum maps to
+-- `public."UserRole"` at the DB level, so the column has to be the enum
+-- type, not TEXT (otherwise prisma.user.update fails with
+-- "type public.UserRole does not exist").
+CREATE TYPE "UserRole" AS ENUM ('USER', 'ADMIN');
+
+-- Add role column to users
+ALTER TABLE "users" ADD COLUMN "role" "UserRole" NOT NULL DEFAULT 'USER';
 
 -- audit_log table
 CREATE TABLE "audit_log" (
