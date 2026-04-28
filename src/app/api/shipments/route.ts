@@ -6,7 +6,13 @@ import { createShipmentSchema, shipmentsQuerySchema } from "@/lib/validations";
 import { trackShipment, TrackingError } from "@/backend/services/tracking";
 import { ShipsgoProvider } from "@/backend/services/tracking/providers/shipsgo";
 import { parseTrackingIdentifier } from "@/backend/services/tracking/identifier-parser";
+import { externalExistenceCheck } from "@/backend/services/tracking/external-check";
 import type { Prisma } from "@prisma/client";
+
+// Track in-flight ShipsGo creates so a double-click doesn't trigger two
+// concurrent ShipsGo POSTs (which would burn 2 credits before our DB
+// unique constraint kicks in). Keyed on userId+trackingNumber+type.
+const inFlightCreates = new Map<string, Promise<unknown>>();
 
 // ── GET /api/shipments — List user's shipments with filters ──
 export async function GET(req: NextRequest) {
@@ -82,57 +88,106 @@ export async function POST(req: NextRequest) {
   // Frontend can pass confirmCharge:true after the user accepted the
   // "this will use 1 credit" dialog. Default false → safe by default.
   const confirmCharge = body?.confirmCharge === true;
+  const normalized   = trackingNumber.toUpperCase();
+  const logCtx       = `${user.id.slice(0, 8)}/${normalized}`;
 
-  // Validate format + check digit BEFORE any provider call.
-  // This rejects fake/typo numbers without ever touching ShipsGo.
+  // ── Layer A+B: Format + Check Digit Validation ────────────────
+  // Rejects fake/typo numbers without ever touching ShipsGo.
   const parsedId = parseTrackingIdentifier(trackingNumber);
   if (!parsedId.valid) {
-    return NextResponse.json({ error: parsedId.error }, { status: 400 });
+    console.log(`[shipments] FORMAT_OR_CHECK_DIGIT_FAILED ${logCtx}: ${parsedId.error}`);
+    return NextResponse.json(
+      { code: "INVALID_TRACKING_NUMBER", error: parsedId.error },
+      { status: 400 },
+    );
   }
 
-  // Check for duplicate
+  // ── Layer C: Local DB Duplicate Check ─────────────────────────
   const existing = await prisma.shipment.findUnique({
-    where: { userId_trackingNumber: { userId: user.id, trackingNumber: trackingNumber.toUpperCase() } },
+    where: { userId_trackingNumber: { userId: user.id, trackingNumber: normalized } },
   });
   if (existing) {
-    return NextResponse.json({ error: "You are already tracking this number." }, { status: 409 });
+    console.log(`[shipments] DUPLICATE_PREVENTED ${logCtx} (existing id=${existing.id})`);
+    return NextResponse.json(
+      { code: "ALREADY_TRACKED", error: "You are already tracking this number." },
+      { status: 409 },
+    );
   }
 
   // Determine provider from plan
   const provider       = getProviderForPlan(plan as PlanKey);  // "jsoncargo" | "shipsgo"
-  const isLiveTracking = PLANS[plan as PlanKey].liveTracking;  // false for FREE, true for PRO/CUSTOM
+  const isLiveTracking = PLANS[plan as PlanKey].liveTracking;
 
-  // ── Credit guard for ShipsGo (PRO/CUSTOM) ──────────────────────
-  // Before calling trackShipment (which could create a new ShipsGo
-  // shipment and consume 1 credit), we ask ShipsGo if the number is
-  // already in our account's cache. If yes → free. If not → require
-  // explicit user consent via confirmCharge:true.
+  // ── Layers D + E: Cache + External + Confirmation gate ────────
+  // Only relevant when provider charges per-create (ShipsGo).
   if (provider === "shipsgo" && !confirmCharge) {
     const sg = new ShipsgoProvider();
+
+    // Layer D: ShipsGo cache (free GET search)
     const inCache = await sg.existsInCache(trackingNumber, type);
-    if (!inCache) {
+    if (inCache) {
+      console.log(`[shipments] SHIPSGO_CACHE_HIT ${logCtx} (proceeding free)`);
+      // Fall through to trackShipment — it will reuse, no credit.
+    } else {
+      // Layer E: External existence check via free providers
+      const ext = await externalExistenceCheck(trackingNumber, type, parsedId.carrierCode);
+
+      if (ext === "NOT_FOUND") {
+        console.log(`[shipments] EXTERNAL_NOT_FOUND ${logCtx} (blocking create)`);
+        return NextResponse.json(
+          {
+            code:    "SHIPMENT_NOT_FOUND",
+            message: `The number format and check digit are valid, but no shipment was found in external sources. Creating it in ShipsGo would likely waste 1 credit. Resend with confirmCharge:true if you still want to try.`,
+          },
+          { status: 409 },
+        );
+      }
+
+      // FOUND or UNKNOWN → ask the user before charging
+      console.log(`[shipments] WILL_CHARGE_CREDIT ${logCtx} (external=${ext})`);
       return NextResponse.json(
         {
           code:    "WILL_CHARGE_CREDIT",
-          message: `This ${type === "AIR" ? "AWB" : "container"} is not yet in your ShipsGo account. Adding it will use 1 ShipsGo credit. Resend with confirmCharge:true to proceed.`,
+          message: ext === "FOUND"
+            ? `This ${type === "AIR" ? "AWB" : "container"} was verified externally. Adding it will use 1 ShipsGo credit for live tracking. Proceed?`
+            : `This ${type === "AIR" ? "AWB" : "container"} couldn't be verified by free providers, but the format is valid. Adding it will use 1 ShipsGo credit. Proceed?`,
+          externalVerified: ext === "FOUND",
         },
         { status: 409 },
       );
     }
   }
 
-  // Fetch initial tracking data using plan-specific provider
+  // ── Idempotency: prevent double-click double-charge ───────────
+  const lockKey = `${user.id}:${normalized}:${type}`;
+  if (inFlightCreates.has(lockKey)) {
+    console.log(`[shipments] DUPLICATE_PREVENTED (in-flight) ${logCtx}`);
+    return NextResponse.json(
+      { code: "REQUEST_IN_FLIGHT", error: "Already processing this number. Please wait." },
+      { status: 409 },
+    );
+  }
+
+  // Fetch initial tracking data using plan-specific provider.
+  // Wrap in a Promise stored in inFlightCreates so concurrent requests
+  // for the same key are rejected before they can reach ShipsGo.
   let trackingData;
+  const trackPromise = trackShipment(trackingNumber, {
+    skipCache:     true,
+    forceProvider: provider,
+  });
+  inFlightCreates.set(lockKey, trackPromise);
   try {
-    trackingData = await trackShipment(trackingNumber, {
-      skipCache:     true,
-      forceProvider: provider,
-    });
+    trackingData = await trackPromise;
+    console.log(`[shipments] SHIPSGO_CREATED_OR_FETCHED ${logCtx} (events=${trackingData.events.length})`);
   } catch (err) {
+    inFlightCreates.delete(lockKey);
     if (err instanceof TrackingError) {
-      return NextResponse.json({ error: err.message }, { status: 422 });
+      return NextResponse.json({ code: "TRACKING_FAILED", error: err.message }, { status: 422 });
     }
     return NextResponse.json({ error: "Failed to fetch tracking data" }, { status: 500 });
+  } finally {
+    inFlightCreates.delete(lockKey);
   }
 
   // Create shipment with enriched data + plan-specific fields

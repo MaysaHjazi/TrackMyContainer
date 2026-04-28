@@ -84,13 +84,26 @@ export function AddShipmentDialog() {
 
     const data = await res.json().catch(() => ({}));
 
-    // 409 + WILL_CHARGE_CREDIT → ask the user explicitly before paying.
+    // 409 + WILL_CHARGE_CREDIT → external check passed (or unknown);
+    // ask the user explicitly before consuming a credit.
     if (res.status === 409 && data?.code === "WILL_CHARGE_CREDIT") {
       const confirmed = window.confirm(
         `${data.message}\n\nProceed and use 1 credit?`,
       );
       if (confirmed) {
-        await submitTrackingRequest(true);  // retry with explicit consent
+        await submitTrackingRequest(true);
+      }
+      return;
+    }
+
+    // 409 + SHIPMENT_NOT_FOUND → external check actively said the
+    // number doesn't exist. Make the warning louder.
+    if (res.status === 409 && data?.code === "SHIPMENT_NOT_FOUND") {
+      const confirmed = window.confirm(
+        `⚠️ ${data.message}\n\nForce add anyway and use 1 credit?`,
+      );
+      if (confirmed) {
+        await submitTrackingRequest(true);
       }
       return;
     }
@@ -98,7 +111,7 @@ export function AddShipmentDialog() {
     throw new Error(
       typeof data.error === "string"
         ? data.error
-        : "Failed to add shipment. Please check the tracking number.",
+        : data?.message ?? "Failed to add shipment. Please check the tracking number.",
     );
   }
 
