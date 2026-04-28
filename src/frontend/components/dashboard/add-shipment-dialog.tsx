@@ -60,61 +60,6 @@ export function AddShipmentDialog() {
     setLoading(false);
   }
 
-  async function submitTrackingRequest(confirmCharge: boolean): Promise<void> {
-    const res = await fetch("/api/shipments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        trackingNumber: trackingNumber.trim().toUpperCase(),
-        type,
-        nickname: nickname.trim() || undefined,
-        reference: reference.trim() || undefined,
-        notifyEmail,
-        notifyWhatsapp,
-        confirmCharge,
-      }),
-    });
-
-    if (res.ok) {
-      resetForm();
-      setOpen(false);
-      router.refresh();
-      return;
-    }
-
-    const data = await res.json().catch(() => ({}));
-
-    // 409 + WILL_CHARGE_CREDIT → external check passed (or unknown);
-    // ask the user explicitly before consuming a credit.
-    if (res.status === 409 && data?.code === "WILL_CHARGE_CREDIT") {
-      const confirmed = window.confirm(
-        `${data.message}\n\nProceed and use 1 credit?`,
-      );
-      if (confirmed) {
-        await submitTrackingRequest(true);
-      }
-      return;
-    }
-
-    // 409 + SHIPMENT_NOT_FOUND → external check actively said the
-    // number doesn't exist. Make the warning louder.
-    if (res.status === 409 && data?.code === "SHIPMENT_NOT_FOUND") {
-      const confirmed = window.confirm(
-        `⚠️ ${data.message}\n\nForce add anyway and use 1 credit?`,
-      );
-      if (confirmed) {
-        await submitTrackingRequest(true);
-      }
-      return;
-    }
-
-    throw new Error(
-      typeof data.error === "string"
-        ? data.error
-        : data?.message ?? "Failed to add shipment. Please check the tracking number.",
-    );
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!trackingNumber.trim()) {
@@ -126,7 +71,32 @@ export function AddShipmentDialog() {
     setError(null);
 
     try {
-      await submitTrackingRequest(false);
+      const res = await fetch("/api/shipments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trackingNumber: trackingNumber.trim().toUpperCase(),
+          type,
+          nickname:  nickname.trim()  || undefined,
+          reference: reference.trim() || undefined,
+          notifyEmail,
+          notifyWhatsapp,
+        }),
+      });
+
+      if (res.ok) {
+        resetForm();
+        setOpen(false);
+        router.refresh();
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        typeof data.error === "string"
+          ? data.error
+          : data?.message ?? "Failed to add shipment. Please check the tracking number.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
