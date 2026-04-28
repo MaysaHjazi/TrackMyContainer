@@ -16,6 +16,11 @@ datasource db {
 // AUTH & USERS
 // ══════════════════════════════════════════════════════════════
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
@@ -23,6 +28,7 @@ model User {
   emailVerified   DateTime?
   image           String?
   hashedPassword  String?
+  role            UserRole  @default(USER)
 
   // WhatsApp
   phone           String?         // E.164 format e.g. +12125551234
@@ -43,6 +49,7 @@ model User {
   trackingQueries TrackingQuery[]
   apiKeys         ApiKey[]
   teamMemberships TeamMember[]
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -444,4 +451,25 @@ enum ContactRequestStatus {
   PENDING
   CONTACTED
   CLOSED
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUDIT LOG (admin dashboard)
+// ══════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  level     String   @default("info")
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
+  @@index([level, createdAt])
+  @@map("audit_log")
 }
