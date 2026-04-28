@@ -191,7 +191,7 @@ export default async function ShipmentDetailPage({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Back */}
         <Link
-          href="/shipments"
+          href="/dashboard/shipments"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-500
                      transition-colors hover:text-navy-700 dark:text-navy-400 dark:hover:text-navy-200"
         >
