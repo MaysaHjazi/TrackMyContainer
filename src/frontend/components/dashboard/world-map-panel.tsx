@@ -75,35 +75,44 @@ function getStatusText(status: ShipmentStatus): string {
   return map[status] ?? status.replace(/_/g, " ");
 }
 
-/* ── Component ── */
-/* ── Theme-aware color schemes ── */
-/* ── Theme-aware colors — map is always dark & alive ── */
+/* ── Theme-aware color schemes ──────────────────────────────────
+ * Dark mode: deep navy ocean, neon teal/orange accents — matches
+ *            the rest of the dashboard's dark theme.
+ * Light mode: soft sky-blue ocean, slate land, teal/orange accents —
+ *             pulls from the same tokens used elsewhere in the
+ *             dashboard's light cards (slate-200/400, teal-600,
+ *             orange-500, navy-900) so the map stops feeling like
+ *             a foreign element on a white page.
+ */
 const COLORS = {
   dark: {
     bg: "linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%)",
-    land: "#132044",
-    landHover: "#1A2D5E",
-    border: "#1E3468",
-    gridColor: "rgba(0,180,196,0.4)",
-    gridOpacity: "0.06",
-    seaRoute: "rgba(0,180,196,0.35)",
-    airRoute: "rgba(245,130,31,0.35)",
-    portDot: "#00B4C4",
-    portLabel: "rgba(0,180,196,0.7)",
-    labelText: "rgba(255,255,255,0.8)",
+    land:       "#132044",
+    landHover:  "#1A2D5E",
+    border:     "#1E3468",
+    gridColor:  "rgba(0,180,196,0.4)",
+    gridOpacity:"0.06",
+    seaRoute:   "rgba(0,180,196,0.35)",
+    airRoute:   "rgba(245,130,31,0.35)",
+    portDot:    "#00B4C4",
+    portLabel:  "rgba(0,180,196,0.7)",
+    labelText:  "rgba(255,255,255,0.85)",
+    dotStroke:  "rgba(255,255,255,0.6)",
   },
   light: {
-    bg: "linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%)",
-    land: "#132044",
-    landHover: "#1A2D5E",
-    border: "#1E3468",
-    gridColor: "rgba(0,180,196,0.4)",
-    gridOpacity: "0.06",
-    seaRoute: "rgba(0,180,196,0.35)",
-    airRoute: "rgba(245,130,31,0.35)",
-    portDot: "#00B4C4",
-    portLabel: "rgba(0,180,196,0.7)",
-    labelText: "rgba(255,255,255,0.8)",
+    // Soft sky-blue gradient — ocean, not deep space
+    bg:         "linear-gradient(180deg, #F1F5F9 0%, #E0F2FE 50%, #DBEAFE 100%)",
+    land:       "#E2E8F0",  // slate-200 — clearly distinct from ocean
+    landHover:  "#CBD5E1",  // slate-300
+    border:     "#94A3B8",  // slate-400 — visible country outlines
+    gridColor:  "rgba(14,116,144,0.35)",  // teal-700 grid
+    gridOpacity:"0.10",
+    seaRoute:   "rgba(14,116,144,0.55)",  // teal-700 dashes (sea)
+    airRoute:   "rgba(234,88,12,0.55)",   // orange-600 dashes (air)
+    portDot:    "#0891B2",  // teal-600
+    portLabel:  "rgba(14,116,144,0.85)",  // teal-700
+    labelText:  "rgba(30,41,59,0.85)",    // slate-800
+    dotStroke:  "rgba(255,255,255,0.95)", // bright outline so dots pop on light land
   },
 };
 
@@ -296,11 +305,11 @@ export function WorldMapPanel({ shipments }: Props) {
                 <circle
                   r={6 * dotScale}
                   fill={dotColor}
-                  stroke="rgba(255,255,255,0.6)"
+                  stroke={c.dotStroke}
                   strokeWidth={2 * dotScale}
                 />
 
-                {/* Carrier label when zoomed in */}
+                {/* Carrier label when zoomed in — uses theme-aware text colour */}
                 {position.zoom >= 3 && (
                   <text
                     textAnchor="start"
@@ -309,7 +318,7 @@ export function WorldMapPanel({ shipments }: Props) {
                     style={{
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: `${7 * dotScale}px`,
-                      fill: "rgba(255,255,255,0.7)",
+                      fill: c.labelText,
                       fontWeight: 700,
                     }}
                   >
