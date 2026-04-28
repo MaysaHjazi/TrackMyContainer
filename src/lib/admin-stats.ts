@@ -45,6 +45,52 @@ export async function getShipsgoCredits(): Promise<{
   return { total, used, remaining: Math.max(0, total - used) };
 }
 
+// ── Card: JSONCargo usage ───────────────────────────────────
+// Counts every /api/track lookup that hit JSONCargo, broken down
+// across today / this month / lifetime, with cache-hit ratio
+// (cache hits don't burn quota). Optional env JSONCARGO_MONTHLY_QUOTA
+// renders a "used / quota" progress headline.
+export async function getJsonCargoUsage(): Promise<{
+  today:        number;
+  thisMonth:    number;
+  total:        number;
+  cacheHitRate: number;
+  quota:        number | null;
+  remaining:    number | null;
+}> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const todayStart = startOfToday();
+
+  const [today, thisMonth, total, monthHits] = await Promise.all([
+    prisma.trackingQuery.count({
+      where: { provider: "jsoncargo", createdAt: { gte: todayStart } },
+    }),
+    prisma.trackingQuery.count({
+      where: { provider: "jsoncargo", createdAt: { gte: startOfMonth } },
+    }),
+    prisma.trackingQuery.count({
+      where: { provider: "jsoncargo" },
+    }),
+    prisma.trackingQuery.count({
+      where: { provider: "jsoncargo", cacheHit: true, createdAt: { gte: startOfMonth } },
+    }),
+  ]);
+
+  const cacheHitRate = thisMonth === 0 ? 0 : monthHits / thisMonth;
+  const quotaRaw = process.env.JSONCARGO_MONTHLY_QUOTA;
+  const quota = quotaRaw && Number.isFinite(parseInt(quotaRaw, 10))
+    ? parseInt(quotaRaw, 10)
+    : null;
+  // Cache hits don't consume quota — only "real" API calls do
+  const consumed = thisMonth - monthHits;
+  const remaining = quota === null ? null : Math.max(0, quota - consumed);
+
+  return { today, thisMonth, total, cacheHitRate, quota, remaining };
+}
+
 // ── Card: API calls today ───────────────────────────────────
 export async function getApiCallsToday(): Promise<{ total: number; cacheHitRate: number }> {
   const since = startOfToday();

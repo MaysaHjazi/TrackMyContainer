@@ -1,4 +1,4 @@
-import { Users, Ship, CreditCard, Activity, AlertTriangle, DollarSign, MailQuestion } from "lucide-react";
+import { Users, Ship, CreditCard, Activity, AlertTriangle, DollarSign, MailQuestion, Database } from "lucide-react";
 import {
   getUserCounts,
   getShipmentCounts,
@@ -9,6 +9,7 @@ import {
   getRecentActivity,
   getApiCallsByDay,
   getPendingContactRequests,
+  getJsonCargoUsage,
 } from "@/lib/admin-stats";
 import { KpiCard }       from "@/frontend/components/admin/kpi-card";
 import { ActivityFeed }  from "@/frontend/components/admin/activity-feed";
@@ -18,7 +19,7 @@ import { formatPrice, formatDate } from "@/lib/utils";
 export const metadata = { title: "Admin · Overview" };
 
 export default async function AdminOverviewPage() {
-  const [users, shipments, credits, apiToday, errors24h, mrr, recent, chartData, pending] =
+  const [users, shipments, credits, apiToday, errors24h, mrr, recent, chartData, pending, jsonCargo] =
     await Promise.all([
       getUserCounts(),
       getShipmentCounts(),
@@ -29,6 +30,7 @@ export default async function AdminOverviewPage() {
       getRecentActivity(),
       getApiCallsByDay(),
       getPendingContactRequests(),
+      getJsonCargoUsage(),
     ]);
 
   return (
@@ -82,6 +84,21 @@ export default async function AdminOverviewPage() {
           primary={formatPrice(mrr)}
           secondary={`${users.pro} active PRO subs`}
           tone="green"
+        />
+        <KpiCard
+          icon={Database}
+          label="JSONCargo this month"
+          primary={
+            jsonCargo.quota !== null
+              ? `${jsonCargo.thisMonth} / ${jsonCargo.quota}`
+              : String(jsonCargo.thisMonth)
+          }
+          secondary={
+            jsonCargo.quota !== null
+              ? `${jsonCargo.remaining} remaining · ${Math.round(jsonCargo.cacheHitRate * 100)}% cache`
+              : `${jsonCargo.today} today · ${Math.round(jsonCargo.cacheHitRate * 100)}% cache · ${jsonCargo.total} all-time`
+          }
+          tone="teal"
         />
       </div>
 
