@@ -300,11 +300,18 @@ export default async function ShipmentDetailPage({
             JSONCargo don't provide ETD, so showing an empty "ETD: —" just
             confuses the user. Hide missing fields; keep the meaningful ones. */}
         {(() => {
+          // Show only one date per pair: actual takes priority over
+          // estimated. Once a vessel actually departs (ATD set), the
+          // ETD becomes irrelevant noise; same for ATA over ETA.
+          // If neither is set yet, show nothing for that pair.
+          const departureDate = shipment.atdDate ?? shipment.etdDate;
+          const departureLabel = shipment.atdDate ? "ATD" : "ETD";
+          const arrivalDate    = shipment.ataDate ?? shipment.etaDate;
+          const arrivalLabel   = shipment.ataDate ? "ATA" : "ETA";
+
           const dateFields = [
-            { label: "ETD", date: shipment.etdDate, icon: Calendar },
-            { label: "ATD", date: shipment.atdDate, icon: Calendar },
-            { label: "ETA", date: shipment.etaDate, icon: Clock },
-            { label: "ATA", date: shipment.ataDate, icon: CheckCircle2 },
+            { label: departureLabel, date: departureDate, icon: Calendar },
+            { label: arrivalLabel,   date: arrivalDate,   icon: Clock    },
           ].filter((f) => f.date);
 
           if (dateFields.length === 0) return null;
