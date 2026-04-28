@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Package, BarChart2, Bell, Settings, LogOut, Zap } from "lucide-react";
+import { LayoutDashboard, Package, BarChart2, Bell, Settings, LogOut, Zap, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscription, isPro } from "@/frontend/subscription-provider";
@@ -15,7 +15,12 @@ const NAV_ITEMS = [
   { href: "/dashboard/settings",     icon: Settings,        label: "Settings",      proOnly: false },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Server-resolved admin flag — adds the ShieldCheck "Admin" link below settings. */
+  isAdmin?: boolean;
+}
+
+export function Sidebar({ isAdmin = false }: SidebarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const sub = useSubscription();
@@ -66,6 +71,27 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin link — only rendered when the layout resolved isAdmin=true. */}
+        {isAdmin && (() => {
+          const active = pathname === "/admin" || pathname.startsWith("/admin/");
+          return (
+            <Link
+              href="/admin"
+              title="Admin"
+              className={cn("sidebar-icon group relative", active && "active")}
+            >
+              <ShieldCheck size={24} strokeWidth={active ? 2.2 : 1.8} />
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-orange-500" />
+              <span className="absolute left-full ml-2 whitespace-nowrap rounded-md
+                               bg-navy-900 px-2.5 py-1.5
+                               text-xs font-semibold text-white opacity-0 pointer-events-none
+                               group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+                Admin
+              </span>
+            </Link>
+          );
+        })()}
       </nav>
 
       {/* Logout */}

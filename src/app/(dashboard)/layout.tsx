@@ -8,6 +8,7 @@ import { createClient }    from "@/lib/supabase/server";
 import { SubscriptionProvider } from "@/frontend/subscription-provider";
 import type { SubscriptionInfo } from "@/frontend/subscription-provider";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin-auth";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -21,6 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   /* Fetch subscription info for tier gating */
   let subInfo: SubscriptionInfo | null = null;
+  let userIsAdmin = false;
   try {
     const dbUser = await getAuthenticatedUser();
     if (dbUser?.subscription) {
@@ -33,6 +35,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
         maxTeamMembers: dbUser.subscription.maxTeamMembers,
       };
     }
+    if (dbUser) {
+      userIsAdmin = await isAdmin({
+        id:    dbUser.id,
+        email: dbUser.email,
+        role:  (dbUser.role as "USER" | "ADMIN") ?? "USER",
+      });
+    }
   } catch {
     /* DB not available — default to FREE */
   }
@@ -40,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <SubscriptionProvider subscription={subInfo}>
       <div className="flex h-screen overflow-hidden bg-navy-50 dark:bg-navy-950">
-        <Sidebar />
+        <Sidebar isAdmin={userIsAdmin} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <DashboardHeader userName={userName} />
           <main className="flex-1 min-h-0 overflow-y-auto">
