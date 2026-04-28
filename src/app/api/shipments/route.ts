@@ -178,6 +178,22 @@ export async function POST(req: NextRequest) {
   try {
     trackingData = await trackPromise;
     console.log(`[shipments] SHIPSGO_CREATED_OR_FETCHED ${logCtx} (events=${trackingData.events.length})`);
+
+    // Log this provider call to tracking_queries so the admin
+    // dashboard's per-provider tiles (JSONCargo, ShipsGo) include
+    // shipment-creation traffic, not just public /api/track lookups.
+    // skipCache:true above means this never came from local cache.
+    prisma.trackingQuery
+      .create({
+        data: {
+          userId:         user.id,
+          trackingNumber: trackingData.trackingNumber,
+          type:           trackingData.type,
+          provider:       trackingData.provider,
+          cacheHit:       false,
+        },
+      })
+      .catch(() => {});
   } catch (err) {
     inFlightCreates.delete(lockKey);
     if (err instanceof TrackingError) {

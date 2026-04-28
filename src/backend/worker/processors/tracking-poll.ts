@@ -32,6 +32,22 @@ export async function trackingPollProcessor(
     forceProvider: job.data.trackingProvider,  // re-poll using same provider as original add
   });
 
+  // Log this poll to tracking_queries so the admin dashboard's
+  // provider-usage tiles (JSONCargo, ShipsGo) reflect ALL traffic,
+  // not just public /api/track lookups. cacheHit is always false
+  // here — we forced skipCache above. Non-fatal.
+  prisma.trackingQuery
+    .create({
+      data: {
+        userId:         userId ?? undefined,
+        trackingNumber: result.trackingNumber,
+        type:           result.type,
+        provider:       result.provider,
+        cacheHit:       false,
+      },
+    })
+    .catch(() => {});
+
   const statusChanged  = result.currentStatus !== shipment.currentStatus;
   const etaChanged     = result.etaDate?.toISOString() !== shipment.etaDate?.toISOString();
   const newlyDelivered = result.currentStatus === "DELIVERED" && shipment.currentStatus !== "DELIVERED";
