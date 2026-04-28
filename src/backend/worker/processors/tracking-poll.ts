@@ -4,6 +4,7 @@ import { trackShipment }           from "@/backend/services/tracking";
 import { notificationQueue }       from "@/backend/lib/queue";
 import { prisma }                  from "@/backend/lib/db";
 import { daysUntil }               from "@/lib/utils";
+import { recordEvent }             from "@/lib/audit-log";
 
 /**
  * Polls tracking APIs for a single shipment,
@@ -14,6 +15,7 @@ export async function trackingPollProcessor(
 ): Promise<void> {
   const { shipmentId, trackingNumber, userId } = job.data;
 
+  try {
   // Fetch current state from DB
   const shipment = await prisma.shipment.findUnique({
     where: { id: shipmentId },
@@ -66,6 +68,12 @@ export async function trackingPollProcessor(
         eventDate:   e.eventDate,
         source:      e.source,
       })),
+    });
+    void recordEvent({
+      type:    "tracking.poll_ok",
+      message: `${trackingNumber}: ${newEvents.length} new event${newEvents.length === 1 ? "" : "s"}`,
+      userId,
+      metadata: { shipmentId, trackingNumber, newEvents: newEvents.length },
     });
   }
 
@@ -210,5 +218,15 @@ export async function trackingPollProcessor(
         });
       }
     }
+  }
+  } catch (err) {
+    void recordEvent({
+      type:    "tracking.poll_failed",
+      level:   "error",
+      message: `${job.data.trackingNumber}: ${err instanceof Error ? err.message : "poll failed"}`,
+      userId:  job.data.userId,
+      metadata: { shipmentId: job.data.shipmentId, trackingNumber: job.data.trackingNumber },
+    });
+    throw err; // let BullMQ see the failure
   }
 }

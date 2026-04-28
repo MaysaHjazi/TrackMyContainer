@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { prisma } from "@/backend/lib/db";
+import { recordEvent } from "@/lib/audit-log";
 import type { NotificationType } from "@prisma/client";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -61,6 +62,12 @@ export async function sendEmail({
         externalId: data?.id ?? null,
       },
     });
+    void recordEvent({
+      type:    "notification.sent",
+      message: `EMAIL · ${notificationType} → ${to}`,
+      userId,
+      metadata: { channel: "EMAIL", notificationType, to },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     await prisma.notification.update({
@@ -68,6 +75,13 @@ export async function sendEmail({
       data:  { status: "FAILED", error: msg, failedAt: new Date() },
     });
     console.error("[email] failed to send:", msg);
+    void recordEvent({
+      type:    "notification.failed",
+      level:   "error",
+      message: `EMAIL · ${notificationType} → ${to}: ${msg}`,
+      userId,
+      metadata: { channel: "EMAIL", notificationType, to, error: msg },
+    });
     throw err;
   }
 }

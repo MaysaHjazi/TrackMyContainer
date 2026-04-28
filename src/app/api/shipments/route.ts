@@ -7,6 +7,7 @@ import { trackShipment, TrackingError } from "@/backend/services/tracking";
 import { ShipsgoProvider } from "@/backend/services/tracking/providers/shipsgo";
 import { parseTrackingIdentifier } from "@/backend/services/tracking/identifier-parser";
 import { externalExistenceCheck } from "@/backend/services/tracking/external-check";
+import { recordEvent } from "@/lib/audit-log";
 import type { Prisma } from "@prisma/client";
 
 // Track in-flight ShipsGo creates so a double-click doesn't trigger two
@@ -180,6 +181,13 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     inFlightCreates.delete(lockKey);
     if (err instanceof TrackingError) {
+      void recordEvent({
+        type:    "shipment.create_failed",
+        level:   "warning",
+        message: `${trackingNumber}: ${err instanceof Error ? err.message : "tracking failed"}`,
+        userId:  user.id,
+        metadata: { trackingNumber, type },
+      });
       return NextResponse.json({ code: "TRACKING_FAILED", error: err.message }, { status: 422 });
     }
     return NextResponse.json({ error: "Failed to fetch tracking data" }, { status: 500 });
@@ -232,6 +240,13 @@ export async function POST(req: NextRequest) {
       },
     },
     include: { trackingEvents: true },
+  });
+
+  void recordEvent({
+    type:    "shipment.created",
+    message: `${trackingNumber} added (${type}, provider=${provider})`,
+    userId:  user.id,
+    metadata: { shipmentId: shipment.id, trackingNumber, type, provider },
   });
 
   return NextResponse.json(shipment, { status: 201 });

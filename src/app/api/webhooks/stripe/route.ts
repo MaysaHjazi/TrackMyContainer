@@ -3,6 +3,7 @@ import type Stripe                  from "stripe";
 import { stripe }                   from "@/backend/lib/stripe";
 import { prisma }                   from "@/backend/lib/db";
 import { PLANS }                    from "@/config/plans";
+import { recordEvent }              from "@/lib/audit-log";
 
 /**
  * POST /api/webhooks/stripe
@@ -23,8 +24,19 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     console.error("[Stripe webhook] Signature verification failed:", err);
+    void recordEvent({
+      type:    "billing.error",
+      level:   "error",
+      message: `Stripe webhook failed: ${err instanceof Error ? err.message : "unknown"}`,
+    });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
+
+  void recordEvent({
+    type:    "billing.event",
+    message: `Stripe: ${event.type}`,
+    metadata: { stripeEventType: event.type, stripeEventId: event.id },
+  });
 
   try {
     switch (event.type) {

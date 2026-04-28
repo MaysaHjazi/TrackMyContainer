@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/backend/lib/db";
+import { recordEvent } from "@/lib/audit-log";
 import type { User, Subscription } from "@prisma/client";
 
 export type AuthenticatedUser = User & { subscription: Subscription | null };
@@ -41,6 +42,12 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
         },
       },
       include: { subscription: true },
+    });
+
+    void recordEvent({
+      type:    "user.signed_up",
+      message: `${dbUser.email} created their account`,
+      userId:  dbUser.id,
     });
   }
 

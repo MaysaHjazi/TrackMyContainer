@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/backend/lib/db";
+import { recordEvent } from "@/lib/audit-log";
 import { Resend } from "resend";
 
 function escHtml(s: string | null | undefined): string {
@@ -53,6 +54,12 @@ export async function POST(req: NextRequest) {
     console.error("[contact] DB error:", err);
     return NextResponse.json({ error: "Failed to save contact request" }, { status: 500 });
   }
+
+  void recordEvent({
+    type:    "contact.received",
+    message: `${contact.name} (${contact.email}) — ${contact.containersCount} containers/mo`,
+    metadata: { contactRequestId: contact.id, email: contact.email, containersCount: contact.containersCount },
+  });
 
   // ── Admin email notification (best-effort) ─────────────────
   const resendApiKey = process.env.RESEND_API_KEY;
