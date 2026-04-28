@@ -45,18 +45,51 @@ export async function getShipsgoCredits(): Promise<{
   return { total, used, remaining: Math.max(0, total - used) };
 }
 
+// ── JSONCargo live quota (direct API call) ──────────────────
+// Hits GET /api/v1/api_key/stats — returns actual counter from
+// JSONCargo's servers, bypassing our DB entirely. Non-fatal.
+async function fetchJsonCargoLiveStats(): Promise<{
+  requestsMade:      number;
+  requestsAvailable: number;
+  requestsTotal:     number;
+} | null> {
+  const apiKey = process.env.JSONCARGO_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("http://api.jsoncargo.com/api/v1/api_key/stats", {
+      headers: { "x-api-key": apiKey },
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      requests_made?: number;
+      requests_available?: number;
+      requests_total?: number;
+    };
+    if (typeof data.requests_made !== "number") return null;
+    return {
+      requestsMade:      data.requests_made,
+      requestsAvailable: data.requests_available ?? 0,
+      requestsTotal:     data.requests_total ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── Card: JSONCargo usage ───────────────────────────────────
-// Counts every /api/track lookup that hit JSONCargo, broken down
-// across today / this month / lifetime, with cache-hit ratio
-// (cache hits don't burn quota). Optional env JSONCARGO_MONTHLY_QUOTA
-// renders a "used / quota" progress headline.
+// Primary numbers come from JSONCargo's live API stats endpoint
+// (ground truth). DB counts are kept as fallback and for cache-hit ratio.
 export async function getJsonCargoUsage(): Promise<{
-  today:        number;
-  thisMonth:    number;
-  total:        number;
-  cacheHitRate: number;
-  quota:        number | null;
-  remaining:    number | null;
+  today:             number;
+  thisMonth:         number;
+  consumed:          number;
+  total:             number;
+  cacheHitRate:      number;
+  quota:             number | null;
+  remaining:         number | null;
+  live:              { requestsMade: number; requestsAvailable: number; requestsTotal: number } | null;
 }> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -64,7 +97,7 @@ export async function getJsonCargoUsage(): Promise<{
 
   const todayStart = startOfToday();
 
-  const [today, thisMonth, total, monthHits] = await Promise.all([
+  const [today, thisMonth, total, monthHits, live] = await Promise.all([
     prisma.trackingQuery.count({
       where: { provider: "jsoncargo", createdAt: { gte: todayStart } },
     }),
@@ -77,18 +110,20 @@ export async function getJsonCargoUsage(): Promise<{
     prisma.trackingQuery.count({
       where: { provider: "jsoncargo", cacheHit: true, createdAt: { gte: startOfMonth } },
     }),
+    fetchJsonCargoLiveStats(),
   ]);
 
   const cacheHitRate = thisMonth === 0 ? 0 : monthHits / thisMonth;
   const quotaRaw = process.env.JSONCARGO_MONTHLY_QUOTA;
-  const quota = quotaRaw && Number.isFinite(parseInt(quotaRaw, 10))
-    ? parseInt(quotaRaw, 10)
-    : null;
-  // Cache hits don't consume quota — only "real" API calls do
-  const consumed = thisMonth - monthHits;
-  const remaining = quota === null ? null : Math.max(0, quota - consumed);
+  const quota = live?.requestsTotal
+    ? live.requestsTotal
+    : quotaRaw && Number.isFinite(parseInt(quotaRaw, 10))
+      ? parseInt(quotaRaw, 10)
+      : null;
+  const consumed = live ? live.requestsMade : thisMonth - monthHits;
+  const remaining = live ? live.requestsAvailable : (quota === null ? null : Math.max(0, quota - consumed));
 
-  return { today, thisMonth, total, cacheHitRate, quota, remaining };
+  return { today, thisMonth, consumed, total, cacheHitRate, quota, remaining, live };
 }
 
 // ── Card: API calls today ───────────────────────────────────

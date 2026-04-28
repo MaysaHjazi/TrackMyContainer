@@ -90,12 +90,12 @@ export default async function AdminOverviewPage() {
           label="JSONCargo this month"
           primary={
             jsonCargo.quota !== null
-              ? `${jsonCargo.thisMonth} / ${jsonCargo.quota}`
-              : String(jsonCargo.thisMonth)
+              ? `${jsonCargo.consumed} / ${jsonCargo.quota}`
+              : String(jsonCargo.consumed)
           }
           secondary={
             jsonCargo.quota !== null
-              ? `${jsonCargo.remaining} remaining · ${Math.round(jsonCargo.cacheHitRate * 100)}% cache`
+              ? `${jsonCargo.remaining} remaining · ${Math.round(jsonCargo.cacheHitRate * 100)}% cache${jsonCargo.live ? " · live" : ""}`
               : `${jsonCargo.today} today · ${Math.round(jsonCargo.cacheHitRate * 100)}% cache · ${jsonCargo.total} all-time`
           }
           tone="teal"
