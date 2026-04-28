@@ -56,22 +56,25 @@ async function fetchJsonCargoLiveStats(): Promise<{
   const apiKey = process.env.JSONCARGO_API_KEY;
   if (!apiKey) return null;
   try {
-    const res = await fetch("http://api.jsoncargo.com/api/v1/api_key/stats", {
+    const res = await fetch("https://api.jsoncargo.com/api/v1/api_key/stats", {
       headers: { "x-api-key": apiKey },
       signal: AbortSignal.timeout(4000),
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const data = await res.json() as {
-      requests_made?: number;
-      requests_available?: number;
-      requests_total?: number;
+    const json = await res.json() as {
+      data?: {
+        requests_made?: number;
+        requests_available?: number;
+        requests_total?: number;
+      };
     };
-    if (typeof data.requests_made !== "number") return null;
+    const stats = json.data;
+    if (!stats || typeof stats.requests_made !== "number") return null;
     return {
-      requestsMade:      data.requests_made,
-      requestsAvailable: data.requests_available ?? 0,
-      requestsTotal:     data.requests_total ?? 0,
+      requestsMade:      stats.requests_made,
+      requestsAvailable: stats.requests_available ?? 0,
+      requestsTotal:     stats.requests_total ?? 0,
     };
   } catch {
     return null;
