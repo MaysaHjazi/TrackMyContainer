@@ -1,12 +1,22 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/backend/lib/db";
-import { trackingPollQueue } from "@/backend/lib/queue";
+import { trackingPollQueue, DISPATCHER_REPEAT_EVERY_MS } from "@/backend/lib/queue";
 
 /**
  * Scheduler fan-out: enumerate every active shipment and enqueue a
- * `tracking-poll` job for it. Uses `jobId: shipmentId` so if the previous
- * run's job for the same shipment is still queued/processing, BullMQ
- * skips the duplicate and we don't stack up backlog during slow polls.
+ * `tracking-poll` job for it.
+ *
+ * jobId is bucketed by dispatch window (`shipmentId:bucket`) and we set
+ * removeOnComplete/removeOnFail so the ID is freed once a poll finishes.
+ * Two requirements at once:
+ *   1. Within a single 30-min window, a duplicate dispatcher tick (or
+ *      manual kick) for the same shipment is deduped — we don't stack up
+ *      backlog while a slow poll is still running.
+ *   2. Across windows, the next tick CAN re-enqueue the same shipment
+ *      because the bucket suffix changes. (The previous version used a
+ *      bare `jobId: shipmentId`, and BullMQ remembered completed jobs in
+ *      Redis history — every redispatch silently no-op'd, so each
+ *      shipment was only ever polled once after creation.)
  */
 export async function trackingDispatchProcessor(job: Job): Promise<void> {
   console.log(`[tracking-dispatch] Processing job ${job.id} (${job.name})`);
@@ -29,8 +39,11 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
     return;
   }
 
+  // Bucket by dispatch window: every shipment gets a fresh jobId per cycle.
+  const bucket = Math.floor(Date.now() / DISPATCHER_REPEAT_EVERY_MS);
+  let added = 0;
   for (const s of shipments) {
-    await trackingPollQueue.add(
+    const result = await trackingPollQueue.add(
       "poll",
       {
         shipmentId:       s.id,
@@ -39,9 +52,14 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
         userId:           s.userId,
         trackingProvider: s.trackingProvider,  // "jsoncargo" | "shipsgo"
       },
-      { jobId: s.id },
+      {
+        jobId:            `${s.id}:${bucket}`,
+        removeOnComplete: true,
+        removeOnFail:     true,
+      },
     );
+    if (result?.id) added++;
   }
 
-  console.log(`[tracking-dispatch] Enqueued poll jobs for ${shipments.length} shipment(s)`);
+  console.log(`[tracking-dispatch] Enqueued ${added}/${shipments.length} poll job(s) (bucket=${bucket})`);
 }
