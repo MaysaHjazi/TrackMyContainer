@@ -15,6 +15,9 @@ services:
     environment:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
+      # env_file's parser drops display names containing spaces / "<>"
+      # — keep this here so emails render as "TrackMyContainer" in the inbox
+      - "RESEND_FROM=TrackMyContainer <onboarding@resend.dev>"
     networks:
       - tmc-net
     depends_on:
@@ -29,6 +32,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env.production
+    environment:
+      # See note on next-app — env_file mangles values with spaces / "<>"
+      - "RESEND_FROM=TrackMyContainer <onboarding@resend.dev>"
     networks:
       - tmc-net
 
