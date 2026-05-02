@@ -6,7 +6,7 @@ import { trackingPollQueue, DISPATCHER_REPEAT_EVERY_MS } from "@/backend/lib/que
  * Scheduler fan-out: enumerate every active shipment and enqueue a
  * `tracking-poll` job for it.
  *
- * jobId is bucketed by dispatch window (`shipmentId:bucket`) and we set
+ * jobId is bucketed by dispatch window (`shipmentId-bucket`) and we set
  * removeOnComplete/removeOnFail so the ID is freed once a poll finishes.
  * Two requirements at once:
  *   1. Within a single 30-min window, a duplicate dispatcher tick (or
@@ -53,7 +53,7 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
         trackingProvider: s.trackingProvider,  // "jsoncargo" | "shipsgo"
       },
       {
-        jobId:            `${s.id}:${bucket}`,
+        jobId:            `${s.id}-${bucket}`,
         removeOnComplete: true,
         removeOnFail:     true,
       },
