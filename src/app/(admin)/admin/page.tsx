@@ -1,3 +1,9 @@
+// Always render fresh — KPI cards (especially shipsgo credits, JSONCargo
+// live quota, errors-24h) must reflect the moment the admin loads the
+// page. Without this Next.js caches the RSC output and "shipsgo credits"
+// shows yesterday's count even after a new shipment was just created.
+export const dynamic = "force-dynamic";
+
 import { Users, Ship, CreditCard, Activity, AlertTriangle, DollarSign, MailQuestion, Database } from "lucide-react";
 import {
   getUserCounts,

@@ -2,6 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/backend/lib/db";
 import { cn, relativeDate } from "@/lib/utils";
 
+// Always render fresh so brand-new errors appear without a manual refresh
+// loop or container restart.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Admin · Errors" };
 
 interface SearchParams {

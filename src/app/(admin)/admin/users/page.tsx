@@ -1,6 +1,9 @@
 import { prisma } from "@/backend/lib/db";
 import { cn, formatDate, relativeDate } from "@/lib/utils";
 
+// Always render fresh so newly-created users show up immediately.
+export const dynamic = "force-dynamic";
+
 export const metadata = { title: "Admin · Users" };
 
 interface SearchParams {
