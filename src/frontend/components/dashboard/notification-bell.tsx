@@ -56,14 +56,19 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationPreview[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch unread notifications
+  // Fetch unread notifications.
+  // API returns { data: NotificationPreview[], total, page, limit } — `data`
+  // is the rows, `total` is the count of all matching rows. With ?unread=true
+  // the filter is `status != READ`, so `total` IS the unread count.
+  // (Earlier this component read .notifications / .totalUnread, which never
+  // existed in the response → the bell stayed blank forever.)
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications?unread=true&limit=5");
       if (!res.ok) return;
-      const data = await res.json();
-      setUnreadCount(data.totalUnread ?? data.notifications?.length ?? 0);
-      setNotifications(data.notifications ?? []);
+      const json = await res.json();
+      setUnreadCount(typeof json.total === "number" ? json.total : 0);
+      setNotifications(Array.isArray(json.data) ? json.data : []);
     } catch {
       // silently fail
     }
