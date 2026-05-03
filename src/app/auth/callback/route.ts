@@ -37,6 +37,15 @@ export async function GET(request: Request) {
   const origin = publicOrigin(request);
 
   if (code) {
+    // Diagnostic: log the cookie names available so we can see if PKCE
+    // verifier cookie reached the server.
+    const cookieHeader = request.headers.get("cookie") ?? "";
+    const cookieNames = cookieHeader
+      .split(";")
+      .map((c) => c.trim().split("=")[0])
+      .filter(Boolean);
+    console.log(`[auth/callback] cookies received (${cookieNames.length}):`, cookieNames.join(", "));
+
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
