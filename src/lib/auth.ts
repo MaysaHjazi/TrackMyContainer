@@ -15,35 +15,57 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
 
   if (!user?.email) return null;
 
-  // Find or auto-create user in Prisma DB
-  let dbUser = await prisma.user.findUnique({
+  // Find or auto-create user in Prisma DB.
+  //
+  // The first time a user lands on the dashboard, Next.js renders
+  // multiple Server Components in parallel — layout + page + KPI cards
+  // each call getAuthenticatedUser concurrently. The earlier
+  // findUnique → create pattern raced: every parallel call saw
+  // findUnique=null, all of them tried prisma.user.create, the second
+  // (and later) ones threw P2002 (Unique constraint on `email`),
+  // bubbled up as Next.js's "server-side exception" and crashed the
+  // dashboard right after a successful Google sign-in.
+  //
+  // Atomic upsert collapses both the check and the insert into one
+  // statement: races become benign, and `subscription` is only
+  // created on the create branch (the connectOrCreate-style nested
+  // write below).
+  const fallbackName =
+    user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email.split("@")[0];
+  const avatar = user.user_metadata?.avatar_url ?? user.user_metadata?.picture;
+
+  // Cheap pre-read so we can detect the "newly created" case without
+  // a second round-trip — upsert can't tell us whether it inserted
+  // or updated.
+  const existed = await prisma.user.findUnique({
     where: { email: user.email },
+    select: { id: true },
+  });
+
+  const dbUser = await prisma.user.upsert({
+    where: { email: user.email },
+    update: {}, // never overwrite name/image on subsequent logins
+    create: {
+      email: user.email,
+      name:  fallbackName,
+      image: avatar,
+      subscription: {
+        create: {
+          stripeCustomerId:    `free_${user.id}`,
+          plan:                "FREE",
+          status:              "ACTIVE",
+          maxTrackedShipments: 5,      // FREE plan: 5 lifetime containers
+          maxDailyQueries:     50,
+          whatsappEnabled:     false,
+          apiAccessEnabled:    false,
+          maxTeamMembers:      1,
+        },
+      },
+    },
     include: { subscription: true },
   });
 
-  if (!dbUser) {
-    // Auto-create user + FREE subscription on first login
-    dbUser = await prisma.user.create({
-      data: {
-        email: user.email,
-        name:  user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email.split("@")[0],
-        image: user.user_metadata?.avatar_url ?? user.user_metadata?.picture,
-        subscription: {
-          create: {
-            stripeCustomerId:    `free_${user.id}`,
-            plan:                "FREE",
-            status:              "ACTIVE",
-            maxTrackedShipments: 5,      // FREE plan: 5 lifetime containers
-            maxDailyQueries:     50,
-            whatsappEnabled:     false,
-            apiAccessEnabled:    false,
-            maxTeamMembers:      1,
-          },
-        },
-      },
-      include: { subscription: true },
-    });
-
+  if (!existed) {
     void recordEvent({
       type:    "user.signed_up",
       message: `${dbUser.email} created their account`,
