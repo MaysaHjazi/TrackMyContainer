@@ -34,15 +34,41 @@ export async function getShipmentCounts(): Promise<{ total: number; active: numb
   return { total, active };
 }
 
-// ── Card: ShipsGo credits (NEVER calls ShipsGo API) ─────────
+// ── Card: ShipsGo credits ───────────────────────────────────
+// "Used" is read from ShipsGo directly via GET /v2/ocean/shipments —
+// `meta.total` excludes deleted/discarded shipments, so it matches the
+// account's real consumed-credit count (1 successful create = 1 credit
+// = 1 row in their list). Falls back to our local DB count if the API
+// is unreachable. The live call is FREE on ShipsGo (GET endpoints are
+// not metered).
+async function fetchShipsgoUsed(): Promise<number | null> {
+  const apiKey = process.env.SHIPSGO_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("https://api.shipsgo.com/v2/ocean/shipments?limit=1", {
+      headers: { "X-Shipsgo-User-Token": apiKey },
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { meta?: { total?: number } };
+    if (typeof data.meta?.total !== "number") return null;
+    return data.meta.total;
+  } catch {
+    return null;
+  }
+}
+
 export async function getShipsgoCredits(): Promise<{
-  total: number; used: number; remaining: number;
+  total: number; used: number; remaining: number; live: boolean;
 }> {
   const total = parseInt(process.env.SHIPSGO_TOTAL_CREDITS ?? "10", 10);
-  const used  = await prisma.shipment.count({
-    where: { trackingProvider: "shipsgo" },
-  });
-  return { total, used, remaining: Math.max(0, total - used) };
+  const [liveUsed, dbUsed] = await Promise.all([
+    fetchShipsgoUsed(),
+    prisma.shipment.count({ where: { trackingProvider: "shipsgo" } }),
+  ]);
+  const used = liveUsed ?? dbUsed;
+  return { total, used, remaining: Math.max(0, total - used), live: liveUsed !== null };
 }
 
 // ── JSONCargo live quota (direct API call) ──────────────────

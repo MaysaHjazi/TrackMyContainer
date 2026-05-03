@@ -235,6 +235,45 @@ export async function trackingPollProcessor(
       }
     }
   }
+
+  // ── EVENT UPDATE — fire when new events appeared but none of the
+  // higher-priority specific notifications above triggered. This is
+  // the "in-between" status (vessel departed, transshipment, customs
+  // hold, etc.) that the user wants to see in their inbox in real time
+  // with TrackMyContainer branding instead of waiting for ShipsGo's
+  // own — and now-disabled — emails.
+  const triggeredSpecificNotice = newlyDelivered || newlyDelayed || isArrivingSoon;
+  if (newEvents.length > 0 && !triggeredSpecificNotice) {
+    const eventsPayload = newEvents.map((e) => ({
+      status:      e.status,
+      location:    e.location ?? null,
+      description: e.description ?? null,
+      eventDate:   e.eventDate.toISOString(),
+    }));
+    const payloadBase = {
+      name:            user.name ?? "there",
+      number:          trackingNumber,
+      currentStatus:   result.currentStatus,
+      currentLocation: result.currentLocation ?? null,
+      events:          eventsPayload,
+      url:             trackUrl,
+    };
+
+    if (emailEnabled) {
+      await notificationQueue.add("status-change-email", {
+        userId, shipmentId,
+        channel: "EMAIL", type: "STATUS_CHANGE",
+        payload: { ...payloadBase, email: user.email },
+      });
+    }
+    if (whatsappEnabled) {
+      await notificationQueue.add("status-change-whatsapp", {
+        userId, shipmentId,
+        channel: "WHATSAPP", type: "STATUS_CHANGE",
+        payload: { ...payloadBase, phone: user.phone! },
+      });
+    }
+  }
   } catch (err) {
     void recordEvent({
       type:    "tracking.poll_failed",

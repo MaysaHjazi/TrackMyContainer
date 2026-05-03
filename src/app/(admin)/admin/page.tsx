@@ -67,7 +67,7 @@ export default async function AdminOverviewPage() {
           icon={CreditCard}
           label="ShipsGo credits"
           primary={`${credits.used} / ${credits.total}`}
-          secondary={`${credits.remaining} remaining`}
+          secondary={`${credits.remaining} remaining${credits.live ? " · live" : ""}`}
           tone="orange"
         />
         <KpiCard

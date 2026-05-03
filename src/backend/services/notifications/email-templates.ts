@@ -2,12 +2,32 @@
  * HTML email templates for shipment notifications.
  * Kept inline (no external template engine) to keep the worker simple.
  *
- * All templates follow the same structure:
- *   - Header with branded color band
- *   - Shipment summary card
- *   - Primary CTA button to view in dashboard
- *   - Footer with unsubscribe note
+ * Brand palette (matches tailwind.config.ts):
+ *   navy   #1B2B5E    primary, header band
+ *   navy-deep #08101E  gradient end
+ *   orange #F5821F    CTA, accent
+ *   teal   #00B4C4    positive / sea theme
+ *
+ * Every template shares the same chrome:
+ *   1. Navy gradient header band with TrackMyContainer wordmark
+ *   2. Status-typed card with brand-colored left border
+ *   3. Orange CTA button → dashboard
+ *   4. Footer with settings link
  */
+
+// ── Brand tokens ────────────────────────────────────────────
+const BRAND = {
+  navy:       "#1B2B5E",
+  navyDark:   "#08101E",
+  orange:     "#F5821F",
+  orangeDark: "#E06610",
+  teal:       "#00B4C4",
+  ink:        "#0F1933",
+  body:       "#475569",
+  card:       "#FFFFFF",
+  page:       "#EEF1F9",   // very light navy tint
+  border:     "#D4DBF0",
+};
 
 interface BaseArgs {
   name:           string;
@@ -22,37 +42,73 @@ function escHtml(s: string | null | undefined): string {
     .replace(/>/g, "&gt;");
 }
 
-function shell(opts: { title: string; preheader: string; accentColor: string; body: string }): string {
+// ── Chrome ──────────────────────────────────────────────────
+
+function shell(opts: { title: string; preheader: string; body: string }): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>${escHtml(opts.title)}</title></head>
-<body style="margin:0;padding:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <span style="display:none;font-size:1px;color:#f5f7fa;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escHtml(opts.preheader)}</span>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f5f7fa;padding:32px 16px;">
+<body style="margin:0;padding:0;background:${BRAND.page};font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:${BRAND.ink};">
+  <span style="display:none;font-size:1px;color:${BRAND.page};line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escHtml(opts.preheader)}</span>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${BRAND.page};padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05);">
-        <tr><td style="background:${opts.accentColor};height:6px;"></td></tr>
-        <tr><td style="padding:32px 32px 8px;">
-          <p style="margin:0;font-size:13px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;font-weight:600;">TrackMyContainer</p>
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:${BRAND.card};border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(27,43,94,0.08);">
+
+        <!-- Brand header band: navy gradient + wordmark -->
+        <tr><td style="background:linear-gradient(135deg,${BRAND.navy} 0%,${BRAND.navyDark} 100%);padding:24px 32px;">
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="vertical-align:middle;">
+                <p style="margin:0;font-size:18px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;">
+                  Track<span style="color:${BRAND.orange};">My</span>Container<span style="color:${BRAND.orange};">.</span>
+                </p>
+                <p style="margin:4px 0 0;font-size:11px;color:${BRAND.teal};letter-spacing:2px;text-transform:uppercase;font-weight:600;">Real-time shipment intelligence</p>
+              </td>
+            </tr>
+          </table>
         </td></tr>
+
         ${opts.body}
-        <tr><td style="padding:24px 32px;border-top:1px solid #e5e7eb;background:#f9fafb;">
-          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">
-            You're receiving this because email notifications are enabled for this shipment.
-            Manage preferences in your <a href="${escHtml(opts.body.includes("https://") ? "" : "")}/dashboard/settings" style="color:#6b7280;text-decoration:underline;">dashboard settings</a>.
+
+        <!-- Footer -->
+        <tr><td style="padding:24px 32px;border-top:1px solid ${BRAND.border};background:${BRAND.page};">
+          <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;">
+            You're receiving this because email alerts are enabled for this shipment.
+            Manage preferences in your
+            <a href="https://trackmycontainer.info/dashboard/settings" style="color:${BRAND.navy};text-decoration:underline;font-weight:600;">dashboard settings</a>.
           </p>
+          <p style="margin:8px 0 0;font-size:11px;color:#94a3b8;">© TrackMyContainer · trackmycontainer.info</p>
         </td></tr>
+
       </table>
     </td></tr>
   </table>
 </body></html>`;
 }
 
-function ctaButton(href: string, label: string, color: string): string {
+function ctaButton(href: string, label: string): string {
   return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 0;">
-    <tr><td style="background:${color};border-radius:10px;">
-      <a href="${escHtml(href)}" style="display:inline-block;padding:12px 28px;color:#ffffff;font-weight:700;font-size:14px;text-decoration:none;">${escHtml(label)}</a>
+    <tr><td style="background:linear-gradient(135deg,${BRAND.orange} 0%,${BRAND.orangeDark} 100%);border-radius:10px;box-shadow:0 4px 12px rgba(245,130,31,0.25);">
+      <a href="${escHtml(href)}" style="display:inline-block;padding:14px 32px;color:#ffffff;font-weight:700;font-size:14px;text-decoration:none;letter-spacing:0.2px;">${escHtml(label)} →</a>
     </td></tr>
   </table>`;
+}
+
+function statusCard(opts: { accent: string; tint: string; rows: Array<{ label: string; value: string }> }): string {
+  return `
+    <tr><td style="padding:0 32px 24px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${opts.tint};border-left:4px solid ${opts.accent};border-radius:10px;padding:20px;">
+        <tr><td>
+          ${opts.rows.map((r, i) => `
+            <p style="margin:${i === 0 ? "0" : "12px 0 0"};font-size:12px;color:${opts.accent};font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">${escHtml(r.label)}</p>
+            <p style="margin:4px 0 0;font-size:${i === 0 ? "18px;font-family:monospace;font-weight:700" : "15px;font-weight:600"};color:${BRAND.ink};">${r.value}</p>
+          `).join("")}
+        </td></tr>
+      </table>
+    </td></tr>`;
+}
+
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -65,25 +121,21 @@ interface DelayArgs extends BaseArgs {
 }
 
 export function delayAlertEmail(args: DelayArgs): { subject: string; html: string } {
-  const subject = `Shipment ${args.trackingNumber} delayed — new ETA ${args.newEta.toLocaleDateString()}`;
+  const subject = `⚠️ ${args.trackingNumber} delayed — new ETA ${args.newEta.toLocaleDateString()}`;
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Container",              value: escHtml(args.trackingNumber) },
+  ];
+  if (args.currentLocation) rows.push({ label: "Current location", value: escHtml(args.currentLocation) });
+  rows.push({ label: "Updated arrival estimate", value: escHtml(fmtDate(args.newEta)) });
+
   const body = `
-    <tr><td style="padding:8px 32px 16px;">
-      <h1 style="margin:0;font-size:22px;color:#1f2937;font-weight:700;">⚠️ Delay detected</h1>
-      <p style="margin:8px 0 0;font-size:15px;color:#4b5563;line-height:1.6;">Hi ${escHtml(args.name)}, your shipment has been delayed.</p>
+    <tr><td style="padding:32px 32px 16px;">
+      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">Delay detected</h1>
+      <p style="margin:10px 0 0;font-size:15px;color:${BRAND.body};line-height:1.6;">Hi ${escHtml(args.name)}, your shipment has been delayed. The carrier issued a new arrival estimate.</p>
     </td></tr>
-    <tr><td style="padding:0 32px 24px;">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#fef3f2;border-left:4px solid #f97316;border-radius:8px;padding:20px;">
-        <tr><td>
-          <p style="margin:0;font-size:13px;color:#92400e;font-weight:600;">Container</p>
-          <p style="margin:4px 0 0;font-size:18px;color:#1f2937;font-weight:700;font-family:monospace;">${escHtml(args.trackingNumber)}</p>
-          ${args.currentLocation ? `<p style="margin:12px 0 0;font-size:13px;color:#92400e;font-weight:600;">Current location</p><p style="margin:4px 0 0;font-size:14px;color:#1f2937;">${escHtml(args.currentLocation)}</p>` : ""}
-          <p style="margin:12px 0 0;font-size:13px;color:#92400e;font-weight:600;">Updated arrival estimate</p>
-          <p style="margin:4px 0 0;font-size:16px;color:#1f2937;font-weight:600;">${escHtml(args.newEta.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }))}</p>
-        </td></tr>
-      </table>
-    </td></tr>
-    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View Shipment", "#f97316")}</td></tr>`;
-  return { subject, html: shell({ title: subject, preheader: `Delay detected on ${args.trackingNumber}`, accentColor: "#f97316", body }) };
+    ${statusCard({ accent: BRAND.orange, tint: "#FFF6ED", rows })}
+    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View shipment")}</td></tr>`;
+  return { subject, html: shell({ title: subject, preheader: `Delay detected on ${args.trackingNumber}`, body }) };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -96,26 +148,23 @@ interface ArrivalArgs extends BaseArgs {
 }
 
 export function arrivalNoticeEmail(args: ArrivalArgs): { subject: string; html: string } {
-  const subject = `✓ Shipment ${args.trackingNumber} arrived at ${args.location}`;
+  const subject = `✓ ${args.trackingNumber} arrived at ${args.location}`;
   const body = `
-    <tr><td style="padding:8px 32px 16px;">
-      <h1 style="margin:0;font-size:22px;color:#1f2937;font-weight:700;">✓ Arrived at destination</h1>
-      <p style="margin:8px 0 0;font-size:15px;color:#4b5563;line-height:1.6;">Hi ${escHtml(args.name)}, your shipment has reached its destination.</p>
+    <tr><td style="padding:32px 32px 16px;">
+      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">Arrived at destination</h1>
+      <p style="margin:10px 0 0;font-size:15px;color:${BRAND.body};line-height:1.6;">Hi ${escHtml(args.name)}, your shipment has reached its destination port.</p>
     </td></tr>
-    <tr><td style="padding:0 32px 24px;">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ecfdf5;border-left:4px solid #10b981;border-radius:8px;padding:20px;">
-        <tr><td>
-          <p style="margin:0;font-size:13px;color:#065f46;font-weight:600;">Container</p>
-          <p style="margin:4px 0 0;font-size:18px;color:#1f2937;font-weight:700;font-family:monospace;">${escHtml(args.trackingNumber)}</p>
-          <p style="margin:12px 0 0;font-size:13px;color:#065f46;font-weight:600;">Arrived at</p>
-          <p style="margin:4px 0 0;font-size:16px;color:#1f2937;font-weight:600;">${escHtml(args.location)}</p>
-          <p style="margin:12px 0 0;font-size:13px;color:#065f46;font-weight:600;">Date</p>
-          <p style="margin:4px 0 0;font-size:14px;color:#1f2937;">${escHtml(args.arrivedAt.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }))}</p>
-        </td></tr>
-      </table>
-    </td></tr>
-    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View Shipment", "#10b981")}</td></tr>`;
-  return { subject, html: shell({ title: subject, preheader: `${args.trackingNumber} arrived at ${args.location}`, accentColor: "#10b981", body }) };
+    ${statusCard({
+      accent: BRAND.teal,
+      tint:   "#EDFCFE",
+      rows: [
+        { label: "Container",  value: escHtml(args.trackingNumber) },
+        { label: "Arrived at", value: escHtml(args.location) },
+        { label: "Date",       value: escHtml(fmtDate(args.arrivedAt)) },
+      ],
+    })}
+    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View shipment")}</td></tr>`;
+  return { subject, html: shell({ title: subject, preheader: `${args.trackingNumber} arrived at ${args.location}`, body }) };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -129,26 +178,105 @@ interface EtaImminentArgs extends BaseArgs {
 
 export function etaImminentEmail(args: EtaImminentArgs): { subject: string; html: string } {
   const dayLabel =
-    args.daysLeft <= 0 ? "today" :
-    args.daysLeft === 1 ? "tomorrow" :
-    `in ${args.daysLeft} days`;
+    args.daysLeft <= 0   ? "today"     :
+    args.daysLeft === 1  ? "tomorrow"  :
+                           `in ${args.daysLeft} days`;
 
-  const subject = `Shipment ${args.trackingNumber} arriving ${dayLabel}`;
+  const subject = `🚢 ${args.trackingNumber} arriving ${dayLabel}`;
   const body = `
-    <tr><td style="padding:8px 32px 16px;">
-      <h1 style="margin:0;font-size:22px;color:#1f2937;font-weight:700;">🚢 Arriving ${escHtml(dayLabel)}</h1>
-      <p style="margin:8px 0 0;font-size:15px;color:#4b5563;line-height:1.6;">Hi ${escHtml(args.name)}, your shipment is on final approach.</p>
+    <tr><td style="padding:32px 32px 16px;">
+      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">Arriving ${escHtml(dayLabel)}</h1>
+      <p style="margin:10px 0 0;font-size:15px;color:${BRAND.body};line-height:1.6;">Hi ${escHtml(args.name)}, your shipment is on final approach. Time to coordinate pickup.</p>
     </td></tr>
-    <tr><td style="padding:0 32px 24px;">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:8px;padding:20px;">
-        <tr><td>
-          <p style="margin:0;font-size:13px;color:#1e3a8a;font-weight:600;">Container</p>
-          <p style="margin:4px 0 0;font-size:18px;color:#1f2937;font-weight:700;font-family:monospace;">${escHtml(args.trackingNumber)}</p>
-          <p style="margin:12px 0 0;font-size:13px;color:#1e3a8a;font-weight:600;">Estimated arrival</p>
-          <p style="margin:4px 0 0;font-size:16px;color:#1f2937;font-weight:600;">${escHtml(args.etaDate.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }))}</p>
-        </td></tr>
+    ${statusCard({
+      accent: BRAND.orange,
+      tint:   "#FFF6ED",
+      rows: [
+        { label: "Container",         value: escHtml(args.trackingNumber) },
+        { label: "Estimated arrival", value: escHtml(fmtDate(args.etaDate)) },
+      ],
+    })}
+    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View shipment")}</td></tr>`;
+  return { subject, html: shell({ title: subject, preheader: `${args.trackingNumber} arriving ${dayLabel}`, body }) };
+}
+
+// ─────────────────────────────────────────────────────────────
+// EVENT UPDATE — fired when one or more new tracking events appear
+// during a poll cycle (and arrival/delay/imminent didn't already fire).
+// Renders a compact timeline of every new event.
+// ─────────────────────────────────────────────────────────────
+
+interface EventUpdateArgs extends BaseArgs {
+  currentStatus:   string;
+  currentLocation: string | null;
+  events: Array<{
+    status:      string;
+    location:    string | null;
+    description: string | null;
+    eventDate:   Date;
+  }>;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  IN_TRANSIT:    "In transit",
+  AT_PORT:       "At port",
+  TRANSSHIPMENT: "Transshipment",
+  CUSTOMS_HOLD:  "Customs hold",
+  DELIVERED:     "Delivered",
+  DELAYED:       "Delayed",
+  EXCEPTION:     "Exception",
+  CREATED:       "Created",
+};
+
+function statusLabel(s: string): string {
+  return STATUS_LABELS[s] ?? s.replace(/_/g, " ").toLowerCase();
+}
+
+export function eventUpdateEmail(args: EventUpdateArgs): { subject: string; html: string } {
+  const n = args.events.length;
+  const subject = n === 1
+    ? `${args.trackingNumber}: ${statusLabel(args.events[0].status)}${args.events[0].location ? ` — ${args.events[0].location}` : ""}`
+    : `${args.trackingNumber}: ${n} new updates`;
+
+  // Timeline: each event is a row with date dot + status label + description
+  const timeline = args.events
+    .slice() // copy
+    .sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime()) // newest first
+    .map((e) => `
+      <tr><td style="padding:14px 0;border-top:1px solid ${BRAND.border};">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+          <tr>
+            <td style="width:14px;vertical-align:top;padding-top:5px;"><span style="display:inline-block;width:9px;height:9px;background:${BRAND.teal};border-radius:50%;"></span></td>
+            <td style="padding-left:12px;">
+              <p style="margin:0;font-size:14px;color:${BRAND.ink};font-weight:700;">${escHtml(statusLabel(e.status))}${e.location ? ` <span style="color:${BRAND.body};font-weight:500;">· ${escHtml(e.location)}</span>` : ""}</p>
+              ${e.description ? `<p style="margin:4px 0 0;font-size:13px;color:${BRAND.body};line-height:1.5;">${escHtml(e.description)}</p>` : ""}
+              <p style="margin:6px 0 0;font-size:11px;color:#94a3b8;letter-spacing:0.3px;text-transform:uppercase;font-weight:600;">${escHtml(e.eventDate.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>`).join("");
+
+  const headline = n === 1 ? "New shipment update" : `${n} new updates`;
+
+  const body = `
+    <tr><td style="padding:32px 32px 16px;">
+      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">${escHtml(headline)}</h1>
+      <p style="margin:10px 0 0;font-size:15px;color:${BRAND.body};line-height:1.6;">Hi ${escHtml(args.name)}, here's the latest from your shipment.</p>
+    </td></tr>
+    ${statusCard({
+      accent: BRAND.navy,
+      tint:   BRAND.page,
+      rows: [
+        { label: "Container",      value: escHtml(args.trackingNumber) },
+        { label: "Current status", value: escHtml(statusLabel(args.currentStatus)) + (args.currentLocation ? ` <span style="color:${BRAND.body};font-weight:500;">· ${escHtml(args.currentLocation)}</span>` : "") },
+      ],
+    })}
+    <tr><td style="padding:0 32px 8px;">
+      <p style="margin:0 0 4px;font-size:12px;color:${BRAND.navy};font-weight:700;letter-spacing:0.5px;text-transform:uppercase;">Timeline</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        ${timeline}
       </table>
     </td></tr>
-    <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View Shipment", "#3b82f6")}</td></tr>`;
-  return { subject, html: shell({ title: subject, preheader: `${args.trackingNumber} arriving ${dayLabel}`, accentColor: "#3b82f6", body }) };
+    <tr><td style="padding:24px 32px 32px;">${ctaButton(args.url, "View full timeline")}</td></tr>`;
+  return { subject, html: shell({ title: subject, preheader: `${args.trackingNumber} — ${headline.toLowerCase()}`, body }) };
 }

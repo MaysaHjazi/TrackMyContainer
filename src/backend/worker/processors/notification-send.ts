@@ -6,6 +6,7 @@ import {
   delayAlertEmail,
   arrivalNoticeEmail,
   etaImminentEmail,
+  eventUpdateEmail,
 } from "@/backend/services/notifications/email-templates";
 
 /**
@@ -112,6 +113,32 @@ async function handleEmail(
         etaDate,
         daysLeft,
         url:            payload.url as string,
+      });
+      break;
+    }
+
+    case "STATUS_CHANGE": {
+      // Event-level update: one or more new tracking events without a
+      // higher-priority arrival/delay/imminent trigger. Dates arrive as
+      // ISO strings via JSON serialization through BullMQ.
+      const events = (payload.events as Array<{
+        status:      string;
+        location:    string | null;
+        description: string | null;
+        eventDate:   string;
+      }>).map((e) => ({
+        status:      e.status,
+        location:    e.location,
+        description: e.description,
+        eventDate:   new Date(e.eventDate),
+      }));
+      rendered = eventUpdateEmail({
+        name:            (payload.name as string) ?? "there",
+        trackingNumber:  payload.number as string,
+        currentStatus:   payload.currentStatus   as string,
+        currentLocation: (payload.currentLocation as string | null) ?? null,
+        events,
+        url:             payload.url as string,
       });
       break;
     }
