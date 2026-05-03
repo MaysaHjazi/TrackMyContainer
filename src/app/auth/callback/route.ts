@@ -37,39 +37,23 @@ export async function GET(request: Request) {
   const origin = publicOrigin(request);
 
   if (code) {
-    const cookieHeader = request.headers.get("cookie") ?? "";
-    const cookieNames = cookieHeader
-      .split(";")
-      .map((c) => c.trim().split("=")[0])
-      .filter(Boolean);
-    console.log(`[auth/callback] BEGIN code=${code.slice(0, 8)}.. cookies(${cookieNames.length}):`, cookieNames.join(", "));
-
     try {
       const supabase = await createClient();
-      console.log(`[auth/callback] supabase client ready, calling exchangeCodeForSession`);
-
-      const startMs = Date.now();
-      // Race against a 20s timeout so a stuck SDK call surfaces instead of
-      // hanging the whole request and tripping nginx 502.
+      // Race against a timeout so a stuck SDK call surfaces in the log
+      // instead of hanging the whole request to nginx's read timeout.
       const result = await Promise.race([
         supabase.auth.exchangeCodeForSession(code),
         new Promise<{ error: { message: string } }>((_, rej) =>
-          setTimeout(() => rej(new Error("EXCHANGE_TIMEOUT_20S")), 20_000),
+          setTimeout(() => rej(new Error("exchange_timeout_20s")), 20_000),
         ),
       ]);
-      console.log(`[auth/callback] exchange returned in ${Date.now() - startMs}ms`);
-
       if (!result?.error) {
-        console.log(`[auth/callback] SUCCESS, redirecting to ${origin}${next}`);
         return NextResponse.redirect(`${origin}${next}`);
       }
-      console.error("[auth/callback] exchangeCodeForSession returned error:", result.error.message);
+      console.error("[auth/callback] exchange error:", result.error.message);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("[auth/callback] threw:", msg);
+      console.error("[auth/callback] threw:", e instanceof Error ? e.message : String(e));
     }
-  } else {
-    console.log("[auth/callback] no code param");
   }
 
   // Auth error — redirect to login with error
