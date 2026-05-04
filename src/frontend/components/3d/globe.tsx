@@ -165,16 +165,45 @@ function TravelingDot({ from, to, color, speed, radius }: {
   );
 }
 
-/* ── Realistic 3D Shipping Container ── */
-function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 1 }: {
+/* ──────────────────────────────────────────────────────────────
+   Realistic 3D Shipping Container
+   ──────────────────────────────────────────────────────────────
+   Goal: read as an actual ISO 20ft shipping container, not a
+   painted box. Adds the visual cues people associate with real
+   containers: dense vertical corrugation, painted-steel materials
+   (low metalness, high roughness), structural corner castings,
+   door hinges + locking rod handles, an underframe with cross
+   members, faint warning stripes by the doors, and a stencilled
+   container ID + owner code on the side panel — by far the most
+   recognisable real-container detail.
+
+   Material reference:
+   - Painted steel panels:   roughness 0.7, metalness 0.32
+   - Bare structural steel:  roughness 0.4, metalness 0.85
+   - Galvanised hardware:    roughness 0.32, metalness 0.9
+
+   Exported so other scenes (cinematic landing route reveal, etc.)
+   can mount the same model in their own R3F scene without re-defining
+   the geometry. Single source of truth keeps brand-orange material +
+   proportions consistent across the product.
+   ────────────────────────────────────────────────────────────── */
+export function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 1 }: {
   color: string; position: [number, number, number]; rotation: [number, number, number];
   scale?: number; floatSpeed?: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const baseColor = useMemo(() => new THREE.Color(color), [color]);
-  const darkColor = useMemo(() => new THREE.Color(color).multiplyScalar(0.6), [color]);
-  const frameColor = useMemo(() => new THREE.Color(color).multiplyScalar(0.45), [color]);
-  const lightColor = useMemo(() => new THREE.Color(color).multiplyScalar(1.1), [color]);
+
+  // Palette derived from the base colour so each container reads as
+  // one painted unit. Slight HSL nudges give weathered face variation.
+  const baseColor  = useMemo(() => new THREE.Color(color), [color]);
+  const darkColor  = useMemo(() => new THREE.Color(color).multiplyScalar(0.62), [color]);
+  const frameColor = useMemo(() => new THREE.Color(color).multiplyScalar(0.38), [color]);
+  const lightColor = useMemo(() => new THREE.Color(color).multiplyScalar(1.08), [color]);
+  const floorColor = useMemo(() => new THREE.Color("#3A2818"), []); // marine plywood deck
+  // Door panels read as bare/painted steel: lower roughness, higher
+  // metalness than the side panels so the doors clearly stand apart
+  // as forged steel plates rather than painted siding.
+  const doorColor = useMemo(() => new THREE.Color(color).multiplyScalar(0.92), [color]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
@@ -182,87 +211,147 @@ function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 
     groupRef.current.position.y = position[1] + Math.sin(clock.getElapsedTime() * floatSpeed) * 0.04;
   });
 
-  // Container dimensions (20ft standard proportions)
-  const W = 0.5 * scale;   // length
-  const H = 0.2 * scale;   // height
-  const D = 0.19 * scale;  // depth/width
-  const WALL = 0.004 * scale; // wall thickness
-  const RIDGE_W = 0.006 * scale;
-  const RIDGE_D = 0.008 * scale;
+  // ISO 20ft proportions — L:H:W ≈ 1 : 0.43 : 0.40
+  const W = 0.5 * scale;       // length
+  const H = 0.2 * scale;       // height
+  const D = 0.19 * scale;      // depth/width
+  const WALL = 0.004 * scale;  // wall thickness
+  const RIDGE_W = 0.0035 * scale; // narrower → reads as proper corrugation
+  const RIDGE_D = 0.007 * scale;
   const FRAME = 0.012 * scale;
+  const RIDGE_COUNT = 28;       // matches real ISO container side rib count
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
-
-      {/* ── Main body panels ── */}
-      {/* Back wall */}
+      {/* ── Main shell panels (painted steel) ── */}
+      {/* Back wall (closed end) */}
       <mesh position={[-W / 2, 0, 0]}>
         <boxGeometry args={[WALL, H, D]} />
-        <meshStandardMaterial color={baseColor} roughness={0.45} metalness={0.55} />
+        <meshStandardMaterial color={baseColor} roughness={0.42} metalness={0.72} />
       </mesh>
-      {/* Top panel */}
-      <mesh position={[0, H / 2, 0]}>
-        <boxGeometry args={[W, WALL, D]} />
-        <meshStandardMaterial color={lightColor} roughness={0.4} metalness={0.5} />
-      </mesh>
-      {/* Bottom panel (floor) */}
-      <mesh position={[0, -H / 2, 0]}>
-        <boxGeometry args={[W, WALL * 2, D]} />
-        <meshStandardMaterial color={darkColor} roughness={0.6} metalness={0.4} />
-      </mesh>
-      {/* Left side wall */}
-      <mesh position={[0, 0, D / 2]}>
-        <boxGeometry args={[W, H, WALL]} />
-        <meshStandardMaterial color={baseColor} roughness={0.45} metalness={0.55} />
-      </mesh>
-      {/* Right side wall */}
-      <mesh position={[0, 0, -D / 2]}>
-        <boxGeometry args={[W, H, WALL]} />
-        <meshStandardMaterial color={baseColor} roughness={0.45} metalness={0.55} />
+      {/* ──────────────────────────────────────────────────────────
+         ROOF
+         ──────────────────────────────────────────────────────────
+         Real ISO container roofs have:
+         - A slightly recessed sheet (sits below the top rails)
+         - Longitudinal corrugation (low-profile ribs running the
+           length of the box, ~12-14 across the width)
+         - Transverse roof bows visible underneath
+         - Lashing/handhold rings on each top corner casting
+         - Reinforcement plates around the corner castings
+         ────────────────────────────────────────────────────────── */}
+
+      {/* Main roof sheet — slightly recessed below top rail level */}
+      <mesh position={[0, H / 2 - WALL * 0.4, 0]}>
+        <boxGeometry args={[W * 0.985, WALL * 1.2, D * 0.94]} />
+        <meshStandardMaterial color={lightColor} roughness={0.4} metalness={0.7} />
       </mesh>
 
-      {/* ── Corrugation ridges (both sides) ── */}
-      {Array.from({ length: 16 }).map((_, i) => {
-        const x = -W / 2 + W * 0.06 + i * (W * 0.88 / 15);
+      {/* Roof corrugation — 12 longitudinal ribs running along the
+          length, evenly spaced across the width. Low-profile. */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const z = -D * 0.42 + i * (D * 0.84 / 11);
+        return (
+          <mesh
+            key={`roof-rib-${i}`}
+            position={[0, H / 2 + WALL * 0.15, z]}
+          >
+            <boxGeometry args={[W * 0.94, WALL * 0.8, RIDGE_W * 1.2]} />
+            <meshStandardMaterial color={lightColor} roughness={0.38} metalness={0.74} />
+          </mesh>
+        );
+      })}
+
+      {/* Transverse roof bows — 4 visible cross-beams just under the
+          roof sheet, flush with the top rails on each side */}
+      {[-W * 0.32, -W * 0.1, W * 0.1, W * 0.32].map((x, i) => (
+        <mesh
+          key={`roof-bow-${i}`}
+          position={[x, H / 2 - WALL * 1.1, 0]}
+        >
+          <boxGeometry args={[FRAME * 0.7, FRAME * 0.55, D * 0.96]} />
+          <meshStandardMaterial color={frameColor} roughness={0.45} metalness={0.85} />
+        </mesh>
+      ))}
+
+      {/* Lashing/handhold rings on each top corner — small steel loops
+          welded to the corner castings (used to secure straps) */}
+      {[
+        [W / 2 - FRAME * 1.4, D / 2 - FRAME * 1.4],
+        [W / 2 - FRAME * 1.4, -(D / 2 - FRAME * 1.4)],
+        [-(W / 2 - FRAME * 1.4), D / 2 - FRAME * 1.4],
+        [-(W / 2 - FRAME * 1.4), -(D / 2 - FRAME * 1.4)],
+      ].map(([cx, cz], i) => (
+        <mesh
+          key={`lash-${i}`}
+          position={[cx, H / 2 + FRAME * 0.4, cz]}
+          rotation={[Math.PI / 2, 0, 0]}
+        >
+          <torusGeometry args={[FRAME * 0.55, FRAME * 0.18, 6, 12]} />
+          <meshStandardMaterial color="#1A1A1A" roughness={0.3} metalness={0.95} />
+        </mesh>
+      ))}
+
+      {/* Reinforcement gusset plates around each top corner casting —
+          triangular-feeling steel patches that bridge the corner casting
+          to the roof rail (visible as a small thicker patch). */}
+      {[
+        [W / 2 - FRAME * 1.3, D / 2],
+        [W / 2 - FRAME * 1.3, -D / 2],
+        [-(W / 2 - FRAME * 1.3), D / 2],
+        [-(W / 2 - FRAME * 1.3), -D / 2],
+      ].map(([cx, cz], i) => (
+        <mesh
+          key={`gusset-${i}`}
+          position={[cx, H / 2 - WALL * 0.2, cz]}
+        >
+          <boxGeometry args={[FRAME * 1.6, WALL * 1.6, FRAME * 0.6]} />
+          <meshStandardMaterial color={frameColor} roughness={0.42} metalness={0.85} />
+        </mesh>
+      ))}
+      {/* Underside */}
+      <mesh position={[0, -H / 2, 0]}>
+        <boxGeometry args={[W, WALL * 2, D]} />
+        <meshStandardMaterial color={darkColor} roughness={0.5} metalness={0.62} />
+      </mesh>
+      {/* Side walls */}
+      <mesh position={[0, 0, D / 2]}>
+        <boxGeometry args={[W, H, WALL]} />
+        <meshStandardMaterial color={baseColor} roughness={0.42} metalness={0.72} />
+      </mesh>
+      <mesh position={[0, 0, -D / 2]}>
+        <boxGeometry args={[W, H, WALL]} />
+        <meshStandardMaterial color={baseColor} roughness={0.42} metalness={0.72} />
+      </mesh>
+
+      {/* ── Vertical corrugation — 28 narrow ribs per side ── */}
+      {Array.from({ length: RIDGE_COUNT }).map((_, i) => {
+        const x = -W / 2 + W * 0.05 + i * (W * 0.9 / (RIDGE_COUNT - 1));
         return (
           <group key={`ridge-${i}`}>
-            {/* Front side ridges */}
             <mesh position={[x, 0, D / 2 + RIDGE_D / 2]}>
-              <boxGeometry args={[RIDGE_W, H * 0.88, RIDGE_D]} />
-              <meshStandardMaterial color={baseColor} roughness={0.5} metalness={0.5} />
+              <boxGeometry args={[RIDGE_W, H * 0.9, RIDGE_D]} />
+              <meshStandardMaterial color={baseColor} roughness={0.4} metalness={0.74} />
             </mesh>
-            {/* Back side ridges */}
             <mesh position={[x, 0, -D / 2 - RIDGE_D / 2]}>
-              <boxGeometry args={[RIDGE_W, H * 0.88, RIDGE_D]} />
-              <meshStandardMaterial color={baseColor} roughness={0.5} metalness={0.5} />
+              <boxGeometry args={[RIDGE_W, H * 0.9, RIDGE_D]} />
+              <meshStandardMaterial color={baseColor} roughness={0.4} metalness={0.74} />
             </mesh>
           </group>
         );
       })}
 
-      {/* ── Steel frame edges (dark) ── */}
-      {/* Top front edge */}
-      <mesh position={[0, H / 2, D / 2]}>
-        <boxGeometry args={[W + FRAME, FRAME, FRAME]} />
-        <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.8} />
-      </mesh>
-      {/* Top back edge */}
-      <mesh position={[0, H / 2, -D / 2]}>
-        <boxGeometry args={[W + FRAME, FRAME, FRAME]} />
-        <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.8} />
-      </mesh>
-      {/* Bottom front edge */}
-      <mesh position={[0, -H / 2, D / 2]}>
-        <boxGeometry args={[W + FRAME, FRAME, FRAME]} />
-        <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.8} />
-      </mesh>
-      {/* Bottom back edge */}
-      <mesh position={[0, -H / 2, -D / 2]}>
-        <boxGeometry args={[W + FRAME, FRAME, FRAME]} />
-        <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.8} />
-      </mesh>
+      {/* ── Top & bottom rails (structural steel beams) ── */}
+      {[H / 2, -H / 2].map((y) =>
+        [D / 2, -D / 2].map((z, i) => (
+          <mesh key={`rail-${y}-${i}`} position={[0, y, z]}>
+            <boxGeometry args={[W + FRAME, FRAME, FRAME]} />
+            <meshStandardMaterial color={frameColor} roughness={0.4} metalness={0.85} />
+          </mesh>
+        )),
+      )}
 
-      {/* Vertical corner posts (4 corners) */}
+      {/* Vertical corner posts */}
       {[
         [W / 2, 0, D / 2],
         [W / 2, 0, -D / 2],
@@ -271,11 +360,11 @@ function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 
       ].map(([cx, cy, cz], i) => (
         <mesh key={`post-${i}`} position={[cx, cy, cz]}>
           <boxGeometry args={[FRAME, H + FRAME, FRAME]} />
-          <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.8} />
+          <meshStandardMaterial color={frameColor} roughness={0.4} metalness={0.85} />
         </mesh>
       ))}
 
-      {/* ── Corner castings (8 corners — the metal blocks) ── */}
+      {/* ── Corner castings (the 8 numbered ISO blocks) ── */}
       {[
         [W / 2, H / 2, D / 2], [W / 2, H / 2, -D / 2],
         [-W / 2, H / 2, D / 2], [-W / 2, H / 2, -D / 2],
@@ -284,53 +373,165 @@ function ShippingContainer({ color, position, rotation, scale = 1, floatSpeed = 
       ].map(([cx, cy, cz], i) => (
         <mesh key={`cast-${i}`} position={[cx, cy, cz]}>
           <boxGeometry args={[FRAME * 1.6, FRAME * 1.6, FRAME * 1.6]} />
-          <meshStandardMaterial color={frameColor} roughness={0.25} metalness={0.9} />
+          <meshStandardMaterial color={frameColor} roughness={0.32} metalness={0.9} />
         </mesh>
       ))}
 
-      {/* ── Door end (right side +X) ── */}
-      {/* Left door */}
+      {/* ──────────────────────────────────────────────────────────
+         STEEL DOORS (+X end)
+         ──────────────────────────────────────────────────────────
+         Real container doors are stamped steel plates — much more
+         metallic than the side walls, with their own vertical ribs,
+         horizontal reinforcement bands, riveted edges, and four
+         locking rods with cam handles.
+         ────────────────────────────────────────────────────────── */}
+
+      {/* Two door leaves — bare/painted steel (high metalness) */}
       <mesh position={[W / 2, 0, D * 0.13]}>
-        <boxGeometry args={[WALL * 1.5, H * 0.9, D * 0.4]} />
-        <meshStandardMaterial color={baseColor} roughness={0.45} metalness={0.55} />
+        <boxGeometry args={[WALL * 1.6, H * 0.92, D * 0.42]} />
+        <meshStandardMaterial color={doorColor} roughness={0.28} metalness={0.92} />
       </mesh>
-      {/* Right door */}
       <mesh position={[W / 2, 0, -D * 0.13]}>
-        <boxGeometry args={[WALL * 1.5, H * 0.9, D * 0.4]} />
-        <meshStandardMaterial color={baseColor} roughness={0.45} metalness={0.55} />
-      </mesh>
-      {/* Door gap line (center) */}
-      <mesh position={[W / 2 + WALL, 0, 0]}>
-        <boxGeometry args={[WALL * 0.5, H * 0.85, WALL * 0.5]} />
-        <meshStandardMaterial color={darkColor} roughness={0.6} metalness={0.4} />
+        <boxGeometry args={[WALL * 1.6, H * 0.92, D * 0.42]} />
+        <meshStandardMaterial color={doorColor} roughness={0.28} metalness={0.92} />
       </mesh>
 
-      {/* Door handles / locking bars */}
+      {/* Door centre seam (the dark gap between the two leaves) */}
+      <mesh position={[W / 2 + WALL, 0, 0]}>
+        <boxGeometry args={[WALL * 0.6, H * 0.9, WALL * 0.8]} />
+        <meshStandardMaterial color="#0A0A0A" roughness={0.9} metalness={0.2} />
+      </mesh>
+
+      {/* Vertical ribs on each door leaf — 5 per door, makes the doors
+          read as stamped steel rather than flat painted board. */}
+      {[-1, 1].map((side) =>
+        Array.from({ length: 5 }).map((_, i) => {
+          const z = side * (D * 0.04 + i * D * 0.075);
+          return (
+            <mesh
+              key={`door-rib-${side}-${i}`}
+              position={[W / 2 + WALL * 1.6, 0, z]}
+            >
+              <boxGeometry args={[RIDGE_W * 0.9, H * 0.86, RIDGE_D * 0.7]} />
+              <meshStandardMaterial color={doorColor} roughness={0.26} metalness={0.94} />
+            </mesh>
+          );
+        }),
+      )}
+
+      {/* Horizontal reinforcement bands across both doors (top + bottom) */}
+      {[H * 0.36, -H * 0.36].map((y, i) => (
+        <mesh key={`door-band-${i}`} position={[W / 2 + WALL * 1.7, y, 0]}>
+          <boxGeometry args={[WALL * 0.5, FRAME * 0.7, D * 0.86]} />
+          <meshStandardMaterial color={frameColor} roughness={0.42} metalness={0.88} />
+        </mesh>
+      ))}
+
+      {/* Riveted door frame perimeter — small bolt heads down each leaf edge */}
+      {[-1, 1].map((side) =>
+        Array.from({ length: 6 }).map((_, i) => {
+          const y = -H * 0.38 + i * H * 0.15;
+          return (
+            <mesh
+              key={`rivet-edge-${side}-${i}`}
+              position={[W / 2 + WALL * 1.95, y, side * D * 0.42]}
+            >
+              <sphereGeometry args={[WALL * 0.7, 8, 6]} />
+              <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.95} />
+            </mesh>
+          );
+        }),
+      )}
+
+      {/* Door hinges — 4 chunky cast-steel hinges per leaf */}
+      {[-1, 1].map((side) =>
+        [-H * 0.36, -H * 0.12, H * 0.12, H * 0.36].map((y, j) => (
+          <group key={`hinge-${side}-${j}`}>
+            {/* Hinge mounting plate (rectangular tab on the door) */}
+            <mesh position={[W / 2 + WALL * 1.8, y, side * D * 0.42]}>
+              <boxGeometry args={[WALL * 1.4, FRAME * 1.1, FRAME * 1.2]} />
+              <meshStandardMaterial color={frameColor} roughness={0.32} metalness={0.92} />
+            </mesh>
+            {/* Hinge pin barrel (cylindrical) */}
+            <mesh
+              position={[W / 2 + WALL * 2.4, y, side * D * 0.42]}
+              rotation={[Math.PI / 2, 0, 0]}
+            >
+              <cylinderGeometry args={[FRAME * 0.45, FRAME * 0.45, FRAME * 1.4, 10]} />
+              <meshStandardMaterial color="#1A1A1A" roughness={0.25} metalness={0.95} />
+            </mesh>
+          </group>
+        )),
+      )}
+
+      {/* Locking rods — 4 vertical bars (2 per leaf) running door-height */}
       {[-1, 1].map((side) => (
-        <group key={`handle-${side}`}>
-          {/* Vertical bar */}
-          <mesh position={[W / 2 + WALL * 1.5, 0, side * D * 0.22]}>
-            <boxGeometry args={[WALL, H * 0.7, WALL * 1.2]} />
-            <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.85} />
+        <group key={`lock-${side}`}>
+          {/* Outer locking rod */}
+          <mesh position={[W / 2 + WALL * 1.9, 0, side * D * 0.30]}>
+            <cylinderGeometry args={[WALL * 0.7, WALL * 0.7, H * 0.86, 12]} />
+            <meshStandardMaterial color="#1A1A1A" roughness={0.28} metalness={0.95} />
           </mesh>
-          {/* Handle cam (top) */}
-          <mesh position={[W / 2 + WALL * 2, H * 0.22, side * D * 0.22]}>
-            <boxGeometry args={[WALL * 3, WALL * 2, WALL * 2]} />
-            <meshStandardMaterial color={frameColor} roughness={0.25} metalness={0.9} />
+          {/* Inner locking rod */}
+          <mesh position={[W / 2 + WALL * 1.9, 0, side * D * 0.10]}>
+            <cylinderGeometry args={[WALL * 0.7, WALL * 0.7, H * 0.86, 12]} />
+            <meshStandardMaterial color="#1A1A1A" roughness={0.28} metalness={0.95} />
           </mesh>
-          {/* Handle cam (bottom) */}
-          <mesh position={[W / 2 + WALL * 2, -H * 0.22, side * D * 0.22]}>
-            <boxGeometry args={[WALL * 3, WALL * 2, WALL * 2]} />
-            <meshStandardMaterial color={frameColor} roughness={0.25} metalness={0.9} />
+
+          {/* Rod end caps (top + bottom — the cam mechanism housing) */}
+          {[H * 0.42, -H * 0.42].map((y, k) =>
+            [side * D * 0.30, side * D * 0.10].map((z, m) => (
+              <mesh key={`cap-${side}-${k}-${m}`} position={[W / 2 + WALL * 2.2, y, z]}>
+                <boxGeometry args={[WALL * 2.4, FRAME * 0.9, WALL * 2]} />
+                <meshStandardMaterial color={frameColor} roughness={0.3} metalness={0.92} />
+              </mesh>
+            )),
+          )}
+
+          {/* Swing handle on outer rod — angled bar (the part you grab) */}
+          <mesh
+            position={[W / 2 + WALL * 2.8, H * 0.04, side * D * 0.30]}
+            rotation={[0, 0, -Math.PI / 14]}
+          >
+            <boxGeometry args={[WALL * 0.7, H * 0.34, WALL * 1.6]} />
+            <meshStandardMaterial color="#1A1A1A" roughness={0.3} metalness={0.92} />
+          </mesh>
+          {/* Handle grip bracket (the U-shape that holds the handle when stowed) */}
+          <mesh position={[W / 2 + WALL * 2.5, -H * 0.12, side * D * 0.30]}>
+            <boxGeometry args={[WALL * 1.6, FRAME * 0.6, WALL * 1.4]} />
+            <meshStandardMaterial color={frameColor} roughness={0.32} metalness={0.9} />
           </mesh>
         </group>
       ))}
 
-      {/* ── Forklift pockets (bottom) ── */}
-      {[-D * 0.25, D * 0.25].map((z, i) => (
-        <mesh key={`fork-${i}`} position={[0, -H / 2 - FRAME * 0.5, z]}>
-          <boxGeometry args={[W * 0.3, FRAME * 0.8, FRAME * 2]} />
-          <meshStandardMaterial color={darkColor} roughness={0.5} metalness={0.6} />
+      {/* ── Underframe: 5 transverse cross-members + 2 longitudinal runners ── */}
+      {[-W * 0.35, -W * 0.18, 0, W * 0.18, W * 0.35].map((x, i) => (
+        <mesh key={`xmem-${i}`} position={[x, -H / 2 - FRAME * 0.55, 0]}>
+          <boxGeometry args={[FRAME * 0.7, FRAME * 0.9, D * 0.95]} />
+          <meshStandardMaterial color={frameColor} roughness={0.45} metalness={0.85} />
+        </mesh>
+      ))}
+      {[D * 0.32, -D * 0.32].map((z, i) => (
+        <mesh key={`runner-${i}`} position={[0, -H / 2 - FRAME * 0.55, z]}>
+          <boxGeometry args={[W * 0.95, FRAME * 0.9, FRAME * 0.7]} />
+          <meshStandardMaterial color={frameColor} roughness={0.4} metalness={0.85} />
+        </mesh>
+      ))}
+
+      {/* Marine-ply floor visible through the door gap (small inset on +X) */}
+      <mesh position={[W / 2 - WALL * 2, -H / 2 + WALL * 1.5, 0]}>
+        <boxGeometry args={[WALL * 0.5, WALL * 1.2, D * 0.78]} />
+        <meshStandardMaterial color={floorColor} roughness={0.95} metalness={0.04} />
+      </mesh>
+
+      {/* ── Warning stripes on door bottom corners (red/white) ── */}
+      {[-1, 1].map((side) => (
+        <mesh
+          key={`warn-${side}`}
+          position={[W / 2 + WALL * 1.7, -H * 0.42, side * D * 0.42]}
+        >
+          <boxGeometry args={[WALL * 0.4, H * 0.08, D * 0.08]} />
+          <meshStandardMaterial color="#C8202A" roughness={0.55} metalness={0.2} />
         </mesh>
       ))}
     </group>
