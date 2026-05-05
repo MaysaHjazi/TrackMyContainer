@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
 import { ThemeProvider, themeInitScript, THEME_COOKIE } from "@/frontend/theme-provider";
@@ -56,13 +56,19 @@ export default async function RootLayout({
   // the right `dark` class on <html> AND the right Hero variant inside.
   // Without this, the server always emits LightHero, the client flips to
   // DarkHero post-hydration, and the user sees the dark page "pop in".
-  const cookieStore = await cookies();
-  const themeFromCookie = cookieStore.get(THEME_COOKIE)?.value;
+  //
+  // We parse the Cookie header directly via headers() rather than going
+  // through cookies() — the Supabase auth middleware mutates the request
+  // cookies object before this layout runs, which made tmc-theme look
+  // undefined to cookies() even though the client sent it.
+  const headerStore = await headers();
+  const cookieHeader = headerStore.get("cookie") ?? "";
+  const tmcMatch = cookieHeader.match(
+    new RegExp("(?:^|;\\s*)" + THEME_COOKIE + "=(\\w+)"),
+  );
+  const themeFromCookie = tmcMatch?.[1];
   const initialTheme: "light" | "dark" =
     themeFromCookie === "dark" ? "dark" : "light";
-
-  // eslint-disable-next-line no-console
-  console.log("[layout] tmc-theme cookie =", themeFromCookie, "→", initialTheme);
 
   return (
     <html
