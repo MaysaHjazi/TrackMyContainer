@@ -28,7 +28,7 @@ export const STATUS_LABELS: Record<ShipmentStatus, string> = {
   PICKED_UP:        "Picked Up",
   IN_TRANSIT:       "In Transit",
   TRANSSHIPMENT:    "Transshipment",
-  AT_PORT:          "At Port",
+  AT_PORT:          "Arrived",
   CUSTOMS_HOLD:     "Customs Hold",
   OUT_FOR_DELIVERY: "Out for Delivery",
   DELIVERED:        "Delivered",

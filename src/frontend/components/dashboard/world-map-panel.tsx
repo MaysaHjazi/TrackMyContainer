@@ -64,11 +64,38 @@ const PORTS: { name: string; coords: [number, number] }[] = [
 function getStatusText(status: ShipmentStatus): string {
   const map: Record<string, string> = {
     IN_TRANSIT: "In Transit", DELAYED: "Delayed", DELIVERED: "Delivered",
-    AT_PORT: "At Port", EXCEPTION: "Exception", CUSTOMS_HOLD: "Customs Hold",
+    AT_PORT: "Arrived", EXCEPTION: "Exception", CUSTOMS_HOLD: "Customs Hold",
     OUT_FOR_DELIVERY: "Out for Delivery", TRANSSHIPMENT: "Transshipment",
     UNKNOWN: "Unknown",
   };
   return map[status] ?? status.replace(/_/g, " ");
+}
+
+/* ── Per-shipment colour palettes ──
+ * Sea shipments cycle through a blue/teal palette, air shipments
+ * through an orange palette, so two SEA routes don't end up sharing
+ * one indistinguishable teal stroke. Picked to stay on-brand and
+ * remain legible on both light and dark map backgrounds. */
+const SEA_PALETTE = [
+  "#00B4C4", // brand teal
+  "#0EA5E9", // sky-500
+  "#3B82F6", // blue-500
+  "#06B6D4", // cyan-500
+  "#0891B2", // cyan-600
+  "#1E40AF", // blue-800
+];
+const AIR_PALETTE = [
+  "#F5821F", // brand orange
+  "#FB923C", // orange-400
+  "#EA580C", // orange-600
+  "#F97316", // orange-500
+  "#FBBF24", // amber-400
+  "#D97706", // amber-600
+];
+
+function shipmentColor(type: "SEA" | "AIR", index: number): string {
+  const palette = type === "SEA" ? SEA_PALETTE : AIR_PALETTE;
+  return palette[index % palette.length];
 }
 
 /* All map colours — including the panel background gradient — now
@@ -88,6 +115,24 @@ export function WorldMapPanel({ shipments }: Props) {
   });
 
   useEffect(() => { setMounted(true); }, []);
+
+  /* Stable colour assignment per shipment id — so each SEA shipment
+     gets its own blue shade and each AIR shipment its own orange,
+     and the colour doesn't change as shipments enter/leave the map. */
+  const colorById = (() => {
+    const map = new Map<string, string>();
+    let seaIdx = 0;
+    let airIdx = 0;
+    for (const s of shipments) {
+      if (s.currentStatus === "DELIVERED" || s.currentStatus === "AT_PORT") continue;
+      if (s.type === "SEA") {
+        map.set(s.id, shipmentColor("SEA", seaIdx++));
+      } else {
+        map.set(s.id, shipmentColor("AIR", airIdx++));
+      }
+    }
+    return map;
+  })();
 
   const handleZoomIn = useCallback(() => {
     setPosition((pos) => ({ ...pos, zoom: Math.min(pos.zoom * 1.5, 8) }));
@@ -155,28 +200,30 @@ export function WorldMapPanel({ shipments }: Props) {
 
           {/* ── Real shipment routes (origin → destination) ─────────
               ONE line per active shipment that has both an origin and a
-              destination we can geocode. Sea = teal dashes, Air = orange
-              dashes. No decorative/random arcs — only what's actually
-              moving in your account.
-              Only DELIVERED shipments are excluded; AT_PORT and
-              TRANSSHIPMENT still represent in-flight cargo and stay on
-              the map. */}
+              destination we can geocode. Sea = blue palette, Air =
+              orange palette. No decorative/random arcs — only what's
+              actually moving in your account.
+              DELIVERED and AT_PORT (= arrived at destination port) are
+              excluded — those shipments are done as far as the map is
+              concerned. */}
           {mounted &&
             shipments
-              .filter((s) => s.currentStatus !== "DELIVERED")
+              .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .map((s) => {
                 const from = toLngLat(s.origin);
                 const to   = toLngLat(s.destination);
                 if (!from || !to) return null;
+                const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
                 return (
                   <Line
                     key={`route-${s.id}`}
                     from={from}
                     to={to}
-                    stroke={s.type === "SEA" ? "var(--wm-sea-route)" : "var(--wm-air-route)"}
+                    stroke={stroke}
                     strokeWidth={1.5 / position.zoom}
                     strokeLinecap="round"
                     strokeDasharray="8 4"
+                    opacity={0.85}
                   />
                 );
               })}
@@ -205,19 +252,21 @@ export function WorldMapPanel({ shipments }: Props) {
           ))}
 
           {/* ── Shipment markers ── */}
-          {/* Only DELIVERED shipments are excluded — anything else
-              (IN_TRANSIT, AT_PORT, TRANSSHIPMENT, DELAYED, EXCEPTION,
-              CUSTOMS_HOLD, OUT_FOR_DELIVERY) is still in flight and
-              earns a marker. */}
-          {shipments.filter((s) => s.currentStatus !== "DELIVERED").map((s) => {
+          {/* DELIVERED and AT_PORT (= arrived at destination) are
+              excluded from the map. Everything else (IN_TRANSIT,
+              TRANSSHIPMENT, DELAYED, EXCEPTION, CUSTOMS_HOLD,
+              OUT_FOR_DELIVERY) is still in flight and earns a marker. */}
+          {shipments
+            .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+            .map((s) => {
             const isDelayed = s.currentStatus === "DELAYED" || s.currentStatus === "EXCEPTION";
-            const isSea = s.type === "SEA";
             const isActive = activeShipment?.id === s.id;
 
-            const dotColor = isDelayed ? "#EF4444" : isSea ? "#00B4C4" : "#F5821F";
-            const glowColor = isDelayed
-              ? "rgba(239,68,68,0.6)"
-              : isSea ? "rgba(0,180,196,0.6)" : "rgba(245,130,31,0.6)";
+            // Per-shipment palette colour. Delayed/exception always
+            // turns red so it stands out regardless of palette index.
+            const baseColor = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+            const dotColor = isDelayed ? "#EF4444" : baseColor;
+            const glowColor = isDelayed ? "rgba(239,68,68,0.6)" : `${baseColor}99`;
 
             // Pick the best coordinate we can: the geocoded current
             // position if we have one, otherwise the midpoint between
