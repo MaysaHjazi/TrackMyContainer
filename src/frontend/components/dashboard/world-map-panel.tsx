@@ -40,6 +40,11 @@ interface ShipmentDot {
    *  cut across land. AIR shipments leave this undefined and fall back
    *  to the great-circle line between port waypoints. */
   routePolyline?: [number, number][];
+  /** Index into `routePolyline` corresponding to the container's
+   *  current position. Vertices ≤ progressIndex are the *travelled*
+   *  leg (solid line); vertices ≥ progressIndex are the *remaining*
+   *  leg (dashed). Lets the map mirror ShipsGo's progress style. */
+  progressIndex?: number;
 }
 
 interface Props {
@@ -222,24 +227,35 @@ export function WorldMapPanel({ shipments }: Props) {
 
                 // Prefer the dense maritime polyline (SEA only) when
                 // available — it's many short segments approximating
-                // the real ocean route.
+                // the real ocean route. Segments BEFORE progressIndex
+                // are travelled (solid); segments AFTER are remaining
+                // (dashed) — mirrors ShipsGo's progress visualisation.
                 if (s.routePolyline && s.routePolyline.length >= 2) {
-                  return s.routePolyline.slice(1).map((to, i) => (
-                    <Line
-                      key={`route-${s.id}-${i}`}
-                      from={s.routePolyline![i]}
-                      to={to}
-                      stroke={stroke}
-                      strokeWidth={1.5 / position.zoom}
-                      strokeLinecap="round"
-                      opacity={0.9}
-                    />
-                  ));
+                  const poly = s.routePolyline;
+                  const progress = s.progressIndex ?? poly.length - 1;
+                  return poly.slice(1).map((to, i) => {
+                    const segmentEndIdx = i + 1;
+                    const isTravelled = segmentEndIdx <= progress;
+                    return (
+                      <Line
+                        key={`route-${s.id}-${i}`}
+                        from={poly[i]}
+                        to={to}
+                        stroke={stroke}
+                        strokeWidth={1.5 / position.zoom}
+                        strokeLinecap="round"
+                        strokeDasharray={isTravelled ? undefined : "6 5"}
+                        opacity={isTravelled ? 0.95 : 0.55}
+                      />
+                    );
+                  });
                 }
 
                 // Fallback: stitch great-circles between port waypoints
                 // (used by AIR shipments and by SEA shipments where
-                // searoute couldn't resolve a path).
+                // searoute couldn't resolve a path). For these we treat
+                // the leg ending at the current location (best-match by
+                // string) as the boundary between travelled and remaining.
                 const waypoints: [number, number][] = (s.route && s.route.length >= 2)
                   ? s.route
                   : (() => {
@@ -250,18 +266,35 @@ export function WorldMapPanel({ shipments }: Props) {
 
                 if (waypoints.length < 2) return [];
 
-                return waypoints.slice(1).map((to, i) => (
-                  <Line
-                    key={`route-${s.id}-${i}`}
-                    from={waypoints[i]}
-                    to={to}
-                    stroke={stroke}
-                    strokeWidth={1.5 / position.zoom}
-                    strokeLinecap="round"
-                    strokeDasharray="8 4"
-                    opacity={0.85}
-                  />
-                ));
+                // Find the waypoint nearest to current location → split point.
+                const cur = toLngLat(s.currentLocation) ?? [s.lng, s.lat];
+                let cutIdx = waypoints.length - 1;
+                if (cur && (cur[0] !== 0 || cur[1] !== 0)) {
+                  let best = Infinity;
+                  for (let i = 0; i < waypoints.length; i++) {
+                    const dlng = waypoints[i][0] - cur[0];
+                    const dlat = waypoints[i][1] - cur[1];
+                    const d = dlng * dlng + dlat * dlat;
+                    if (d < best) { best = d; cutIdx = i; }
+                  }
+                }
+
+                return waypoints.slice(1).map((to, i) => {
+                  const segmentEndIdx = i + 1;
+                  const isTravelled = segmentEndIdx <= cutIdx;
+                  return (
+                    <Line
+                      key={`route-${s.id}-${i}`}
+                      from={waypoints[i]}
+                      to={to}
+                      stroke={stroke}
+                      strokeWidth={1.5 / position.zoom}
+                      strokeLinecap="round"
+                      strokeDasharray={isTravelled ? undefined : "8 4"}
+                      opacity={isTravelled ? 0.95 : 0.55}
+                    />
+                  );
+                });
               })}
 
           {/* ── Intermediate waypoint dots ──

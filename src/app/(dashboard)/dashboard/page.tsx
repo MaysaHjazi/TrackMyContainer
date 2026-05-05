@@ -108,6 +108,34 @@ export default async function DashboardPage() {
       routePolyline = polyline;
     }
 
+    // Locate the live position inside the polyline so the client can
+    // render the *travelled* leg as a solid line and the *remaining*
+    // leg as dashed — matching the way ShipsGo visualises progress.
+    // We use the current location string when known, otherwise the
+    // shipment's lat/lng (filled in by the worker when geocoding).
+    let progressIndex: number | undefined;
+    if (routePolyline && routePolyline.length >= 2) {
+      const currentCoords = s.currentLocation
+        ? getCoordinates(s.currentLocation)
+        : { lat: coords.lat, lng: coords.lng };
+      if (currentCoords.lat !== 0 || currentCoords.lng !== 0) {
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < routePolyline.length; i++) {
+          const [plng, plat] = routePolyline[i];
+          // Squared planar distance — adequate for "nearest vertex" picking.
+          const dlng = plng - currentCoords.lng;
+          const dlat = plat - currentCoords.lat;
+          const d = dlng * dlng + dlat * dlat;
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        }
+        progressIndex = bestIdx;
+      }
+    }
+
     return {
       id: s.id,
       trackingNumber: s.trackingNumber,
@@ -122,6 +150,7 @@ export default async function DashboardPage() {
       lng: coords.lng,
       route,                                        // port-level waypoints (markers)
       routePolyline,                                // dense maritime path (the line)
+      progressIndex,                                // index into routePolyline = current position
     };
   });
 
