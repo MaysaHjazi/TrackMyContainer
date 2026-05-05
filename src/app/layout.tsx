@@ -47,6 +47,10 @@ export const viewport: Viewport = {
   themeColor: "#1B2B5E",
 };
 
+// Force dynamic rendering so the cookie-driven theme always reflects
+// the visitor's preference (otherwise the route may be cached as light).
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: {
