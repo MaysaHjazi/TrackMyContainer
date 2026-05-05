@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/backend/lib/db";
 import { DashboardContent } from "@/frontend/components/dashboard/dashboard-content";
 import { getCoordinates } from "@/lib/port-coordinates";
-import { seaRoute } from "searoute-ts";
 
 /**
  * Dashboard overview — real data from DB.
@@ -71,69 +70,35 @@ export default async function DashboardPage() {
     for (const ev of s.trackingEvents) pushIfKnown(ev.location);
     pushIfKnown(s.destination);
 
-    // For SEA shipments, expand each pair of consecutive port stops
-    // into the actual maritime path using `searoute-ts` — a great-circle
-    // approximation routed around continents. The result is a polyline
-    // that follows real ocean lanes (around the Cape, through Suez,
-    // along the coast) instead of cutting straight across land.
-    //
-    // AIR shipments stay on the great-circle path — flights actually
-    // do go in straight arcs, so the existing rendering is correct.
-    let routePolyline: [number, number][] | undefined;
-    if (s.type === "SEA" && route.length >= 2) {
-      const polyline: [number, number][] = [];
-      for (let i = 0; i < route.length - 1; i++) {
-        const a = route[i];
-        const b = route[i + 1];
-        try {
-          const feature = seaRoute(
-            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: a } },
-            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: b } },
-          );
-          const segCoords = feature?.geometry?.coordinates as [number, number][] | undefined;
-          if (segCoords && segCoords.length > 1) {
-            // Append, but skip the duplicated junction point between segments
-            if (polyline.length === 0) polyline.push(...segCoords);
-            else polyline.push(...segCoords.slice(1));
-          } else {
-            // searoute couldn't resolve — fall back to straight pair
-            if (polyline.length === 0) polyline.push(a);
-            polyline.push(b);
-          }
-        } catch {
-          if (polyline.length === 0) polyline.push(a);
-          polyline.push(b);
-        }
-      }
-      routePolyline = polyline;
-    }
+    // The `route` waypoints are a faithful sequence of the ports the
+    // container has actually been reported at (origin + tracking event
+    // locations + destination, deduped). The map draws straight legs
+    // between consecutive waypoints — we deliberately do NOT try to
+    // synthesise a "real maritime path" client-side, because anything
+    // we generate locally would diverge from what ShipsGo actually
+    // tracks. The events themselves are the source of truth.
 
-    // Locate the live position inside the polyline so the client can
-    // render the *travelled* leg as a solid line and the *remaining*
-    // leg as dashed — matching the way ShipsGo visualises progress.
-    // We use the current location string when known, otherwise the
-    // shipment's lat/lng (filled in by the worker when geocoding).
+    // Find the index of the waypoint corresponding to the current
+    // location so the map can render the leg already travelled (origin
+    // → currentLocation) as a solid line and the remaining leg as dashed.
     let progressIndex: number | undefined;
-    if (routePolyline && routePolyline.length >= 2) {
-      const currentCoords = s.currentLocation
-        ? getCoordinates(s.currentLocation)
-        : { lat: coords.lat, lng: coords.lng };
-      if (currentCoords.lat !== 0 || currentCoords.lng !== 0) {
-        let bestIdx = 0;
-        let bestDist = Infinity;
-        for (let i = 0; i < routePolyline.length; i++) {
-          const [plng, plat] = routePolyline[i];
-          // Squared planar distance — adequate for "nearest vertex" picking.
-          const dlng = plng - currentCoords.lng;
-          const dlat = plat - currentCoords.lat;
-          const d = dlng * dlng + dlat * dlat;
-          if (d < bestDist) {
-            bestDist = d;
-            bestIdx = i;
-          }
-        }
-        progressIndex = bestIdx;
+    if (route.length >= 2 && s.currentLocation) {
+      const target = s.currentLocation.toLowerCase().trim();
+      const labelIdx = routeLabels.indexOf(target);
+      if (labelIdx >= 0) progressIndex = labelIdx;
+    }
+    // Fallback: nearest waypoint to the worker-filled lat/lng.
+    if (progressIndex === undefined && route.length >= 2 && (coords.lat !== 0 || coords.lng !== 0)) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < route.length; i++) {
+        const [plng, plat] = route[i];
+        const dlng = plng - coords.lng;
+        const dlat = plat - coords.lat;
+        const d = dlng * dlng + dlat * dlat;
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
       }
+      progressIndex = bestIdx;
     }
 
     return {
@@ -148,9 +113,9 @@ export default async function DashboardPage() {
       etaDate: s.etaDate?.toISOString() ?? null,   // serialize Date → string for client
       lat: coords.lat,
       lng: coords.lng,
-      route,                                        // port-level waypoints (markers)
-      routePolyline,                                // dense maritime path (the line)
-      progressIndex,                                // index into routePolyline = current position
+      route,                                        // port waypoints (origin + events + destination, deduped)
+      routeLabels,                                  // matching port name per waypoint (for tooltips)
+      progressIndex,                                // index into `route` = current waypoint
     };
   });
 

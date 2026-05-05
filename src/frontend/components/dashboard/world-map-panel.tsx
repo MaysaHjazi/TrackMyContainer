@@ -30,20 +30,18 @@ interface ShipmentDot {
   currentLocation?: string;
   lat: number;
   lng: number;
-  /** Port-level waypoints derived from tracking events (geocoded ports
-   *  in chronological order). Used as marker positions. */
+  /** Port waypoints derived ONLY from real tracking events (origin +
+   *  ShipsGo events + destination, consecutive duplicates removed).
+   *  Each is geocoded `[lng, lat]`. The map draws great-circle legs
+   *  between consecutive entries. We never synthesise extra path
+   *  detail client-side — the events are the single source of truth. */
   route?: [number, number][];
-  /** Dense maritime polyline computed server-side via `searoute-ts`.
-   *  Each consecutive pair of port waypoints is expanded into the
-   *  actual ocean path (around continents, through Suez, along
-   *  coastlines), so SEA shipments don't render straight lines that
-   *  cut across land. AIR shipments leave this undefined and fall back
-   *  to the great-circle line between port waypoints. */
-  routePolyline?: [number, number][];
-  /** Index into `routePolyline` corresponding to the container's
-   *  current position. Vertices ≤ progressIndex are the *travelled*
-   *  leg (solid line); vertices ≥ progressIndex are the *remaining*
-   *  leg (dashed). Lets the map mirror ShipsGo's progress style. */
+  /** Matching port name per waypoint, used for hover tooltips. */
+  routeLabels?: string[];
+  /** Index into `route` for the container's current waypoint. Legs
+   *  ENDING at index ≤ progressIndex render solid (travelled), the
+   *  rest render dashed (remaining) — mirrors ShipsGo's progress
+   *  visualisation. */
   progressIndex?: number;
 }
 
@@ -185,6 +183,28 @@ export function WorldMapPanel({ shipments }: Props) {
         style={{ width: "100%", maxHeight: "100%" }}
         {...({ projection: "geoNaturalEarth1", projectionConfig: { scale: 150, center: [10, 5] } } as Record<string, unknown>)}
       >
+        {/* SVG <defs> — reusable filter / gradient definitions used by
+            every shipment route, marker, and the live pulse. Defining
+            them once at the top is markedly more efficient than inlining
+            per-element filters and gives the route lines a soft
+            chromatic glow that matches dashboards like Linear/Vercel. */}
+        <defs>
+          <filter id="wm-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.2" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="wm-glow-strong" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="3" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
         <ZoomableGroup
           center={position.coordinates}
           zoom={position.zoom}
@@ -212,50 +232,16 @@ export function WorldMapPanel({ shipments }: Props) {
             }
           </Geographies>
 
-          {/* ── Real shipment routes ─────────
-              For SEA shipments we render the dense `routePolyline`
-              computed server-side via searoute-ts — that's the actual
-              ocean path that hugs coastlines and routes through Suez /
-              around the Cape, like ShipsGo's visualisation.
-              For AIR shipments (and as a fallback) we render
-              great-circle arcs between the port-level waypoints. */}
+          {/* ── Shipment routes ─────────
+              Each leg is a great-circle between two real ports the
+              container has been reported at (from ShipsGo events).
+              Travelled legs render solid + glow, remaining legs render
+              dashed + faded — mirroring ShipsGo's progress style. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .flatMap((s) => {
                 const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
-
-                // Prefer the dense maritime polyline (SEA only) when
-                // available — it's many short segments approximating
-                // the real ocean route. Segments BEFORE progressIndex
-                // are travelled (solid); segments AFTER are remaining
-                // (dashed) — mirrors ShipsGo's progress visualisation.
-                if (s.routePolyline && s.routePolyline.length >= 2) {
-                  const poly = s.routePolyline;
-                  const progress = s.progressIndex ?? poly.length - 1;
-                  return poly.slice(1).map((to, i) => {
-                    const segmentEndIdx = i + 1;
-                    const isTravelled = segmentEndIdx <= progress;
-                    return (
-                      <Line
-                        key={`route-${s.id}-${i}`}
-                        from={poly[i]}
-                        to={to}
-                        stroke={stroke}
-                        strokeWidth={1.5 / position.zoom}
-                        strokeLinecap="round"
-                        strokeDasharray={isTravelled ? undefined : "6 5"}
-                        opacity={isTravelled ? 0.95 : 0.55}
-                      />
-                    );
-                  });
-                }
-
-                // Fallback: stitch great-circles between port waypoints
-                // (used by AIR shipments and by SEA shipments where
-                // searoute couldn't resolve a path). For these we treat
-                // the leg ending at the current location (best-match by
-                // string) as the boundary between travelled and remaining.
                 const waypoints: [number, number][] = (s.route && s.route.length >= 2)
                   ? s.route
                   : (() => {
@@ -263,67 +249,103 @@ export function WorldMapPanel({ shipments }: Props) {
                       const b = toLngLat(s.destination);
                       return a && b ? [a, b] : [];
                     })();
-
                 if (waypoints.length < 2) return [];
 
-                // Find the waypoint nearest to current location → split point.
-                const cur = toLngLat(s.currentLocation) ?? [s.lng, s.lat];
-                let cutIdx = waypoints.length - 1;
-                if (cur && (cur[0] !== 0 || cur[1] !== 0)) {
-                  let best = Infinity;
-                  for (let i = 0; i < waypoints.length; i++) {
-                    const dlng = waypoints[i][0] - cur[0];
-                    const dlat = waypoints[i][1] - cur[1];
-                    const d = dlng * dlng + dlat * dlat;
-                    if (d < best) { best = d; cutIdx = i; }
-                  }
-                }
+                const progress = s.progressIndex ?? (waypoints.length - 1);
 
-                return waypoints.slice(1).map((to, i) => {
+                return waypoints.slice(1).flatMap((to, i) => {
                   const segmentEndIdx = i + 1;
-                  const isTravelled = segmentEndIdx <= cutIdx;
+                  const isTravelled = segmentEndIdx <= progress;
+                  const baseW = 1.6 / position.zoom;
+                  if (isTravelled) {
+                    // Two-pass solid line: a soft outer glow underneath
+                    // a crisp top stroke, so travelled legs catch the
+                    // eye without becoming a thick blob.
+                    return [
+                      <Line
+                        key={`route-${s.id}-${i}-glow`}
+                        from={waypoints[i]}
+                        to={to}
+                        stroke={stroke}
+                        strokeWidth={baseW * 2.4}
+                        strokeLinecap="round"
+                        opacity={0.18}
+                      />,
+                      <Line
+                        key={`route-${s.id}-${i}`}
+                        from={waypoints[i]}
+                        to={to}
+                        stroke={stroke}
+                        strokeWidth={baseW}
+                        strokeLinecap="round"
+                        opacity={0.95}
+                      />,
+                    ];
+                  }
                   return (
                     <Line
                       key={`route-${s.id}-${i}`}
                       from={waypoints[i]}
                       to={to}
                       stroke={stroke}
-                      strokeWidth={1.5 / position.zoom}
+                      strokeWidth={baseW * 0.85}
                       strokeLinecap="round"
-                      strokeDasharray={isTravelled ? undefined : "8 4"}
-                      opacity={isTravelled ? 0.95 : 0.55}
+                      strokeDasharray={`${4 / position.zoom} ${3 / position.zoom}`}
+                      opacity={0.45}
                     />
                   );
                 });
               })}
 
-          {/* ── Intermediate waypoint dots ──
-              Every transshipment / port-of-call between origin and
-              destination gets a small dot in the shipment's colour
-              so the reader can see the actual leg-by-leg path. */}
+          {/* ── Intermediate transshipment dots ──
+              Each port-of-call between origin and destination gets a
+              small ringed dot in the shipment's colour. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .flatMap((s) => {
                 const route = s.route ?? [];
-                if (route.length < 3) return []; // need at least one intermediate waypoint
+                if (route.length < 3) return [];
+                const labels = s.routeLabels ?? [];
                 const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
-                // Drop first + last (those are origin / destination, drawn separately below)
                 return route.slice(1, -1).map((pt, i) => (
                   <Marker key={`wp-${s.id}-${i}`} coordinates={pt}>
-                    <circle r={3 * dotScale} fill={color} opacity={0.55} />
-                    <circle r={1.4 * dotScale} fill={color} stroke="#fff" strokeWidth={0.8 * dotScale} />
+                    {/* Soft halo */}
+                    <circle r={5 * dotScale} fill={color} opacity={0.18} />
+                    {/* Outer ring + inner dot — small "transshipment" marker */}
+                    <circle r={2.6 * dotScale} fill="rgba(10,15,30,0.95)" stroke={color} strokeWidth={1.3 * dotScale} />
+                    <circle r={1.1 * dotScale} fill={color} />
+                    {/* Label only when zoomed in to avoid clutter */}
+                    {position.zoom >= 2 && labels[i + 1] && (
+                      <text
+                        textAnchor="middle"
+                        y={-6 * dotScale}
+                        style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: `${6 * dotScale}px`,
+                          fontWeight: 600,
+                          letterSpacing: `${0.3 * dotScale}px`,
+                          fill: color,
+                          paintOrder: "stroke",
+                          stroke: "rgba(6,11,26,0.85)",
+                          strokeWidth: `${1.4 * dotScale}px`,
+                          strokeLinejoin: "round",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {labels[i + 1].toUpperCase()}
+                      </text>
+                    )}
                   </Marker>
                 ));
               })}
 
-          {/* ── Origin & destination labels per shipment ──
-              A solid filled square marks the origin port and a hollow
-              ringed marker marks the destination, both in the shipment's
-              own colour with the port name and "Origin"/"Destination"
-              labels. Makes "where is this shipment going?" obvious at
-              a glance — no more guessing which end of the dashed arc
-              is the start. */}
+          {/* ── Origin & destination ──
+              Origin reads as a small "departure" chip — a filled
+              rounded-square pin in the shipment colour with a darker
+              core, anchored by an UPPERCASE port label.
+              Destination reads as a "target" — a hollow concentric
+              ring set with a small centre dot. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
@@ -333,59 +355,86 @@ export function WorldMapPanel({ shipments }: Props) {
                 const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
                 return (
                   <g key={`endpoints-${s.id}`}>
-                    {/* Origin — solid filled square */}
+                    {/* Origin — refined departure pin */}
                     {from && s.origin && (
                       <Marker coordinates={from}>
+                        {/* Soft drop shadow halo */}
+                        <circle r={7 * dotScale} fill={color} opacity={0.2} />
+                        {/* Outer chip */}
                         <rect
-                          x={-4 * dotScale}
-                          y={-4 * dotScale}
-                          width={8 * dotScale}
-                          height={8 * dotScale}
+                          x={-4.5 * dotScale}
+                          y={-4.5 * dotScale}
+                          width={9 * dotScale}
+                          height={9 * dotScale}
                           fill={color}
-                          stroke="#fff"
-                          strokeWidth={1 * dotScale}
-                          rx={1 * dotScale}
+                          rx={1.6 * dotScale}
+                        />
+                        {/* Inner darker core to give the chip depth */}
+                        <rect
+                          x={-2 * dotScale}
+                          y={-2 * dotScale}
+                          width={4 * dotScale}
+                          height={4 * dotScale}
+                          fill="rgba(6,11,26,0.55)"
+                          rx={0.6 * dotScale}
                         />
                         <text
                           textAnchor="middle"
-                          y={-9 * dotScale}
+                          y={-10 * dotScale}
                           style={{
-                            fontFamily: "Inter, sans-serif",
-                            fontSize: `${8 * dotScale}px`,
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: `${7 * dotScale}px`,
                             fontWeight: 700,
+                            letterSpacing: `${0.4 * dotScale}px`,
                             fill: color,
                             paintOrder: "stroke",
-                            stroke: "rgba(0,0,0,0.65)",
+                            stroke: "rgba(6,11,26,0.9)",
                             strokeWidth: `${2 * dotScale}px`,
                             strokeLinejoin: "round",
+                            textTransform: "uppercase",
                           }}
                         >
                           {s.origin.toUpperCase()}
                         </text>
                       </Marker>
                     )}
-                    {/* Destination — hollow ring + dot */}
+                    {/* Destination — concentric target ring */}
                     {to && s.destination && (
                       <Marker coordinates={to}>
+                        {/* Outer faint halo */}
+                        <circle r={9 * dotScale} fill={color} opacity={0.14} />
+                        {/* Outer ring */}
                         <circle
-                          r={6 * dotScale}
+                          r={6.5 * dotScale}
                           fill="none"
                           stroke={color}
-                          strokeWidth={2 * dotScale}
+                          strokeWidth={1.6 * dotScale}
+                          opacity={0.95}
                         />
-                        <circle r={2 * dotScale} fill={color} />
+                        {/* Inner ring */}
+                        <circle
+                          r={3.5 * dotScale}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={1 * dotScale}
+                          opacity={0.55}
+                        />
+                        {/* Centre dot */}
+                        <circle r={1.6 * dotScale} fill={color} />
                         <text
                           textAnchor="middle"
-                          y={-10 * dotScale}
+                          y={-11 * dotScale}
                           style={{
-                            fontFamily: "Inter, sans-serif",
-                            fontSize: `${8 * dotScale}px`,
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: `${7 * dotScale}px`,
                             fontWeight: 700,
+                            letterSpacing: `${0.4 * dotScale}px`,
                             fill: color,
                             paintOrder: "stroke",
-                            stroke: "rgba(0,0,0,0.65)",
+                            stroke: "rgba(6,11,26,0.9)",
                             strokeWidth: `${2 * dotScale}px`,
                             strokeLinejoin: "round",
+                            textTransform: "uppercase",
                           }}
                         >
                           {s.destination.toUpperCase()}
@@ -467,71 +516,91 @@ export function WorldMapPanel({ shipments }: Props) {
                 onMouseLeave={() => setActiveShipment(null)}
                 style={{ cursor: "pointer" }}
               >
-                {/* Outer pulse ring */}
-                <motion.circle
-                  fill="none"
-                  stroke={dotColor}
-                  strokeWidth={1.5 * dotScale}
-                  initial={{ r: 6 * dotScale, opacity: 0.8 }}
-                  animate={{ r: 24 * dotScale, opacity: 0 }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-                />
-
-                {/* Second pulse ring (offset) */}
+                {/* Three staggered pulse rings — gives the live position
+                    a calm, dashboard-grade pulse rather than a noisy
+                    flicker. Lower opacity, longer duration. */}
                 <motion.circle
                   fill="none"
                   stroke={dotColor}
                   strokeWidth={1 * dotScale}
-                  initial={{ r: 6 * dotScale, opacity: 0.5 }}
-                  animate={{ r: 20 * dotScale, opacity: 0 }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut", delay: 1.1 }}
+                  initial={{ r: 5 * dotScale, opacity: 0.6 }}
+                  animate={{ r: 22 * dotScale, opacity: 0 }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
+                />
+                <motion.circle
+                  fill="none"
+                  stroke={dotColor}
+                  strokeWidth={0.8 * dotScale}
+                  initial={{ r: 5 * dotScale, opacity: 0.4 }}
+                  animate={{ r: 18 * dotScale, opacity: 0 }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut", delay: 0.9 }}
+                />
+                <motion.circle
+                  fill="none"
+                  stroke={dotColor}
+                  strokeWidth={0.6 * dotScale}
+                  initial={{ r: 5 * dotScale, opacity: 0.3 }}
+                  animate={{ r: 14 * dotScale, opacity: 0 }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut", delay: 1.7 }}
                 />
 
-                {/* Extra ring when active */}
+                {/* Extra ring when active (hover/focus state) */}
                 {isActive && (
                   <motion.circle
-                    r={16 * dotScale}
+                    r={12 * dotScale}
                     fill="none"
                     stroke={dotColor}
-                    strokeWidth={2 * dotScale}
-                    strokeDasharray={`${3 * dotScale} ${2 * dotScale}`}
+                    strokeWidth={1.4 * dotScale}
+                    strokeDasharray={`${2 * dotScale} ${2 * dotScale}`}
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.7 }}
+                    animate={{ opacity: 0.9, rotate: 360 }}
+                    transition={{ rotate: { duration: 14, repeat: Infinity, ease: "linear" } }}
                   />
                 )}
 
-                {/* Glow */}
-                <circle r={10 * dotScale} fill={glowColor} opacity={isActive ? 0.6 : 0.4} />
+                {/* Soft chromatic halo behind the dot for depth */}
+                <circle r={8 * dotScale} fill={glowColor} opacity={isActive ? 0.55 : 0.35} filter="url(#wm-glow-strong)" />
 
-                {/* Main dot */}
+                {/* Outer ring — dashboard-style "live" indicator */}
                 <circle
-                  r={6 * dotScale}
-                  fill={dotColor}
-                  stroke="var(--wm-dot-stroke)"
-                  strokeWidth={2 * dotScale}
+                  r={5.5 * dotScale}
+                  fill="none"
+                  stroke={dotColor}
+                  strokeWidth={1.2 * dotScale}
+                  opacity={0.8}
                 />
+                {/* Inner core — solid coloured dot with crisp white seam */}
+                <circle r={3.5 * dotScale} fill={dotColor} stroke="rgba(255,255,255,0.95)" strokeWidth={0.8 * dotScale} />
 
-                {/* Container ID always visible next to the live dot —
-                    that's how the user identifies which arc on the map
-                    belongs to which row in the sidebar. Colour-matched
-                    to the shipment so it ties back to its endpoints. */}
-                <text
-                  textAnchor="start"
-                  x={9 * dotScale}
-                  y={3 * dotScale}
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: `${8 * dotScale}px`,
-                    fontWeight: 800,
-                    fill: dotColor,
-                    paintOrder: "stroke",
-                    stroke: "rgba(0,0,0,0.7)",
-                    strokeWidth: `${2.4 * dotScale}px`,
-                    strokeLinejoin: "round",
-                  }}
-                >
-                  {s.trackingNumber}
-                </text>
+                {/* Container ID — refined floating label */}
+                <g transform={`translate(${10 * dotScale}, ${3.5 * dotScale})`}>
+                  {/* Subtle backing pill so the ID stays legible over land/sea */}
+                  <rect
+                    x={-1.5 * dotScale}
+                    y={-5 * dotScale}
+                    width={s.trackingNumber.length * 4.2 * dotScale + 4 * dotScale}
+                    height={7 * dotScale}
+                    rx={1.5 * dotScale}
+                    fill="rgba(6,11,26,0.78)"
+                    stroke={dotColor}
+                    strokeWidth={0.4 * dotScale}
+                    opacity={0.85}
+                  />
+                  <text
+                    textAnchor="start"
+                    x={0.5 * dotScale}
+                    y={-0.4 * dotScale}
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: `${5.5 * dotScale}px`,
+                      fontWeight: 700,
+                      letterSpacing: `${0.3 * dotScale}px`,
+                      fill: dotColor,
+                    }}
+                  >
+                    {s.trackingNumber}
+                  </text>
+                </g>
               </Marker>
             );
           })}
@@ -696,66 +765,111 @@ export function WorldMapPanel({ shipments }: Props) {
       </AnimatePresence>
 
       {/* ── Legend ──
-          Two parts:
-          1) Marker key — what the square / pulse / ring on the map mean.
-          2) Shipment list — every active shipment, colour-matched to its
-             arc on the map, so the user can read "this purple line is
-             MSCU5165329 going from Ningbo to Itapoa." */}
-      <div className="absolute bottom-4 left-4 flex flex-col gap-2.5 rounded-xl bg-navy-900/85 px-4 py-3 backdrop-blur-md border border-white/5 z-10 max-w-[260px]">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
-          Live Tracking
-        </div>
-
-        {/* Marker key — origin (square), current (pulse), destination (ring) */}
-        <div className="flex items-center gap-3 text-[10px] text-white/60">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm bg-white/70" />
-            Origin
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/70 opacity-50" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white/80" />
+          Glass card, dashboard-style. Three blocks separated by hairline
+          dividers:
+            1. Status header with live indicator pip
+            2. Marker key (origin chip / live pulse / destination ring)
+            3. Per-shipment list with coloured progress bars — click to
+               zoom to that shipment on the map. */}
+      <div className="absolute bottom-4 left-4 z-10 flex w-[280px] flex-col gap-0
+                      rounded-xl bg-navy-950/85 backdrop-blur-xl
+                      ring-1 ring-white/[0.07] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.6)]
+                      overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
             </span>
-            Live
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full border-[1.5px] border-white/70" />
-            Destination
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+              Live Tracking
+            </span>
+          </div>
+          <span className="font-mono text-[10px] font-semibold text-white/35">
+            {shipments.filter(s => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").length} active
           </span>
         </div>
 
-        {/* Per-shipment colour swatches */}
-        {shipments.filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").length > 0 && (
-          <>
-            <div className="h-px bg-white/10" />
-            <div className="flex flex-col gap-1.5">
-              {shipments
-                .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
-                .map((s) => {
-                  const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => handleZoomToShipment(s)}
-                      className="flex items-center gap-2 text-left hover:bg-white/5 rounded px-1 py-0.5 transition-colors"
-                    >
-                      <span
-                        className="h-2.5 w-3 rounded-sm shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="font-mono text-[10px] font-bold text-white/90 truncate">
+        {/* Marker key */}
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5
+                        border-y border-white/[0.06] bg-white/[0.015]">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-[2px] bg-white/85" />
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Origin</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-white/85" />
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Live</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full border-[1.5px] border-white/85" />
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Destination</span>
+          </div>
+        </div>
+
+        {/* Per-shipment list */}
+        {shipments.filter(s => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").length > 0 && (
+          <div className="flex flex-col py-1.5 max-h-[180px] overflow-y-auto">
+            {shipments
+              .filter(s => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+              .map(s => {
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                const total = (s.route?.length ?? 0);
+                const done  = (s.progressIndex ?? 0) + 1;
+                const pct   = total >= 2 ? Math.round((done / Math.max(total - 0, 1)) * 100) : 0;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => handleZoomToShipment(s)}
+                    className="group relative flex flex-col gap-1.5 px-4 py-2 text-left
+                               transition-colors hover:bg-white/[0.04]"
+                  >
+                    {/* Coloured leading bar */}
+                    <span
+                      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full
+                                 transition-all group-hover:w-1"
+                      style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}66` }}
+                    />
+                    <div className="flex items-center justify-between pl-1">
+                      <span className="font-mono text-[11px] font-bold tracking-tight"
+                            style={{ color }}>
                         {s.trackingNumber}
                       </span>
-                      <span className="text-[10px] text-white/45 truncate">
-                        {(s.origin || "?").slice(0, 8)} → {(s.destination || "?").slice(0, 8)}
+                      <span className="font-mono text-[9px] tabular-nums text-white/45">
+                        {pct}%
                       </span>
-                    </button>
-                  );
-                })}
-            </div>
-          </>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-1 text-[10px] text-white/55">
+                      <span className="truncate uppercase tracking-wider">
+                        {(s.origin || "—").slice(0, 12)}
+                      </span>
+                      <svg width="10" height="6" viewBox="0 0 10 6" className="shrink-0 opacity-50">
+                        <path d="M0 3 H8 M5 0 L9 3 L5 6" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="truncate uppercase tracking-wider">
+                        {(s.destination || "—").slice(0, 12)}
+                      </span>
+                    </div>
+                    {/* Progress track */}
+                    <div className="ml-1 h-[2px] w-full rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(100, Math.max(2, pct))}%`,
+                          backgroundColor: color,
+                          boxShadow: `0 0 6px ${color}99`,
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
         )}
       </div>
 
