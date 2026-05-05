@@ -72,25 +72,24 @@ function getStatusText(status: ShipmentStatus): string {
 }
 
 /* ── Per-shipment colour palettes ──
- * Sea shipments cycle through a blue/teal palette, air shipments
- * through an orange palette, so two SEA routes don't end up sharing
- * one indistinguishable teal stroke. Picked to stay on-brand and
- * remain legible on both light and dark map backgrounds. */
+ * Picked for HIGH visual contrast between adjacent shipments — the
+ * earlier teal/sky/cyan combination read as a single colour at map
+ * scale. Sea routes still skew cool, air routes still skew warm. */
 const SEA_PALETTE = [
-  "#00B4C4", // brand teal
-  "#0EA5E9", // sky-500
-  "#3B82F6", // blue-500
-  "#06B6D4", // cyan-500
-  "#0891B2", // cyan-600
-  "#1E40AF", // blue-800
+  "#00B4C4", // bright teal       — brand
+  "#6366F1", // indigo-violet
+  "#0EA5E9", // sky bright
+  "#A855F7", // purple
+  "#1E3A8A", // deep navy
+  "#10B981", // emerald
 ];
 const AIR_PALETTE = [
   "#F5821F", // brand orange
-  "#FB923C", // orange-400
-  "#EA580C", // orange-600
-  "#F97316", // orange-500
-  "#FBBF24", // amber-400
-  "#D97706", // amber-600
+  "#DC2626", // red
+  "#F59E0B", // amber
+  "#DB2777", // rose
+  "#EA580C", // burnt orange
+  "#B45309", // brown amber
 ];
 
 function shipmentColor(type: "SEA" | "AIR", index: number): string {
@@ -228,11 +227,91 @@ export function WorldMapPanel({ shipments }: Props) {
                 );
               })}
 
-          {/* ── Port markers with labels at higher zoom ── */}
+          {/* ── Origin & destination labels per shipment ──
+              A solid filled square marks the origin port and a hollow
+              ringed marker marks the destination, both in the shipment's
+              own colour with the port name and "Origin"/"Destination"
+              labels. Makes "where is this shipment going?" obvious at
+              a glance — no more guessing which end of the dashed arc
+              is the start. */}
+          {mounted &&
+            shipments
+              .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+              .map((s) => {
+                const from = toLngLat(s.origin);
+                const to   = toLngLat(s.destination);
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                return (
+                  <g key={`endpoints-${s.id}`}>
+                    {/* Origin — solid filled square */}
+                    {from && s.origin && (
+                      <Marker coordinates={from}>
+                        <rect
+                          x={-4 * dotScale}
+                          y={-4 * dotScale}
+                          width={8 * dotScale}
+                          height={8 * dotScale}
+                          fill={color}
+                          stroke="#fff"
+                          strokeWidth={1 * dotScale}
+                          rx={1 * dotScale}
+                        />
+                        <text
+                          textAnchor="middle"
+                          y={-9 * dotScale}
+                          style={{
+                            fontFamily: "Inter, sans-serif",
+                            fontSize: `${8 * dotScale}px`,
+                            fontWeight: 700,
+                            fill: color,
+                            paintOrder: "stroke",
+                            stroke: "rgba(0,0,0,0.65)",
+                            strokeWidth: `${2 * dotScale}px`,
+                            strokeLinejoin: "round",
+                          }}
+                        >
+                          {s.origin.toUpperCase()}
+                        </text>
+                      </Marker>
+                    )}
+                    {/* Destination — hollow ring + dot */}
+                    {to && s.destination && (
+                      <Marker coordinates={to}>
+                        <circle
+                          r={6 * dotScale}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={2 * dotScale}
+                        />
+                        <circle r={2 * dotScale} fill={color} />
+                        <text
+                          textAnchor="middle"
+                          y={-10 * dotScale}
+                          style={{
+                            fontFamily: "Inter, sans-serif",
+                            fontSize: `${8 * dotScale}px`,
+                            fontWeight: 700,
+                            fill: color,
+                            paintOrder: "stroke",
+                            stroke: "rgba(0,0,0,0.65)",
+                            strokeWidth: `${2 * dotScale}px`,
+                            strokeLinejoin: "round",
+                          }}
+                        >
+                          {s.destination.toUpperCase()}
+                        </text>
+                      </Marker>
+                    )}
+                  </g>
+                );
+              })}
+
+          {/* ── Reference port markers — kept very faint so they don't
+              compete with the actual shipment endpoints above. */}
           {PORTS.map((port) => (
             <Marker key={port.name} coordinates={port.coords}>
-              <circle r={3 * dotScale} fill="var(--wm-port-dot)" opacity={0.2} />
-              <circle r={1.5 * dotScale} fill="var(--wm-port-dot)" opacity={0.8} />
+              <circle r={3 * dotScale} fill="var(--wm-port-dot)" opacity={0.1} />
+              <circle r={1.5 * dotScale} fill="var(--wm-port-dot)" opacity={0.4} />
               {/* Show port name when zoomed in */}
               {position.zoom >= 2 && (
                 <text
@@ -342,22 +421,27 @@ export function WorldMapPanel({ shipments }: Props) {
                   strokeWidth={2 * dotScale}
                 />
 
-                {/* Carrier label when zoomed in — CSS-driven text colour */}
-                {position.zoom >= 3 && (
-                  <text
-                    textAnchor="start"
-                    x={8 * dotScale}
-                    y={3 * dotScale}
-                    style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize:   `${7 * dotScale}px`,
-                      fill:       "var(--wm-label-text)",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {s.trackingNumber}
-                  </text>
-                )}
+                {/* Container ID always visible next to the live dot —
+                    that's how the user identifies which arc on the map
+                    belongs to which row in the sidebar. Colour-matched
+                    to the shipment so it ties back to its endpoints. */}
+                <text
+                  textAnchor="start"
+                  x={9 * dotScale}
+                  y={3 * dotScale}
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: `${8 * dotScale}px`,
+                    fontWeight: 800,
+                    fill: dotColor,
+                    paintOrder: "stroke",
+                    stroke: "rgba(0,0,0,0.7)",
+                    strokeWidth: `${2.4 * dotScale}px`,
+                    strokeLinejoin: "round",
+                  }}
+                >
+                  {s.trackingNumber}
+                </text>
               </Marker>
             );
           })}
@@ -521,32 +605,68 @@ export function WorldMapPanel({ shipments }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Legend ── */}
-      <div className="absolute bottom-4 left-4 flex flex-col gap-2 rounded-xl bg-navy-900/80 px-4 py-3 backdrop-blur-sm border border-white/5 z-10">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-0.5">
+      {/* ── Legend ──
+          Two parts:
+          1) Marker key — what the square / pulse / ring on the map mean.
+          2) Shipment list — every active shipment, colour-matched to its
+             arc on the map, so the user can read "this purple line is
+             MSCU5165329 going from Ningbo to Itapoa." */}
+      <div className="absolute bottom-4 left-4 flex flex-col gap-2.5 rounded-xl bg-navy-900/85 px-4 py-3 backdrop-blur-md border border-white/5 z-10 max-w-[260px]">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
           Live Tracking
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-40" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-400 shadow-[0_0_6px_rgba(0,180,196,0.8)]" />
+
+        {/* Marker key — origin (square), current (pulse), destination (ring) */}
+        <div className="flex items-center gap-3 text-[10px] text-white/60">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-sm bg-white/70" />
+            Origin
           </span>
-          <span className="text-xs text-white/80">Sea Freight</span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-40" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-400 shadow-[0_0_6px_rgba(245,130,31,0.8)]" />
+          <span className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/70 opacity-50" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white/80" />
+            </span>
+            Live
           </span>
-          <span className="text-xs text-white/80">Air Cargo</span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-40" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full border-[1.5px] border-white/70" />
+            Destination
           </span>
-          <span className="text-xs text-white/80">Delayed</span>
         </div>
+
+        {/* Per-shipment colour swatches */}
+        {shipments.filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").length > 0 && (
+          <>
+            <div className="h-px bg-white/10" />
+            <div className="flex flex-col gap-1.5">
+              {shipments
+                .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+                .map((s) => {
+                  const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleZoomToShipment(s)}
+                      className="flex items-center gap-2 text-left hover:bg-white/5 rounded px-1 py-0.5 transition-colors"
+                    >
+                      <span
+                        className="h-2.5 w-3 rounded-sm shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="font-mono text-[10px] font-bold text-white/90 truncate">
+                        {s.trackingNumber}
+                      </span>
+                      <span className="text-[10px] text-white/45 truncate">
+                        {(s.origin || "?").slice(0, 8)} → {(s.destination || "?").slice(0, 8)}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Shipment count badge (matches what's actually on the map) ── */}
