@@ -111,6 +111,8 @@ const PORTS: Record<string, Coords> = {
   "paranagua":      { lat: -25.5, lng: -48.5 }, // Brazil
   "rio de janeiro": { lat: -22.9, lng: -43.2 }, // Brazil
   "itajai":         { lat: -26.9, lng: -48.7 }, // Brazil
+  "itapoa":         { lat: -26.1, lng: -48.6 }, // Itapoá, Brazil (Santa Catarina)
+  "navegantes":     { lat: -26.9, lng: -48.6 }, // Brazil — sister port to Itajaí
   "montevideo":     { lat: -34.9, lng: -56.2 }, // Uruguay
   "guayaquil":      { lat: -2.2, lng: -79.9 },  // Ecuador
 

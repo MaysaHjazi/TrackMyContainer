@@ -157,10 +157,13 @@ export function WorldMapPanel({ shipments }: Props) {
               ONE line per active shipment that has both an origin and a
               destination we can geocode. Sea = teal dashes, Air = orange
               dashes. No decorative/random arcs — only what's actually
-              moving in your account. */}
+              moving in your account.
+              Only DELIVERED shipments are excluded; AT_PORT and
+              TRANSSHIPMENT still represent in-flight cargo and stay on
+              the map. */}
           {mounted &&
             shipments
-              .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+              .filter((s) => s.currentStatus !== "DELIVERED")
               .map((s) => {
                 const from = toLngLat(s.origin);
                 const to   = toLngLat(s.destination);
@@ -202,11 +205,11 @@ export function WorldMapPanel({ shipments }: Props) {
           ))}
 
           {/* ── Shipment markers ── */}
-          {/* Arrived shipments (DELIVERED or AT_PORT at destination) are
-              excluded from the map — they still appear in stats and the right
-              sidebar, but we don't waste a dot on them (and the dispatcher
-              stops polling them once isActive=false). */}
-          {shipments.filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").map((s) => {
+          {/* Only DELIVERED shipments are excluded — anything else
+              (IN_TRANSIT, AT_PORT, TRANSSHIPMENT, DELAYED, EXCEPTION,
+              CUSTOMS_HOLD, OUT_FOR_DELIVERY) is still in flight and
+              earns a marker. */}
+          {shipments.filter((s) => s.currentStatus !== "DELIVERED").map((s) => {
             const isDelayed = s.currentStatus === "DELAYED" || s.currentStatus === "EXCEPTION";
             const isSea = s.type === "SEA";
             const isActive = activeShipment?.id === s.id;
