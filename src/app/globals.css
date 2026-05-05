@@ -151,14 +151,20 @@
 .status-unknown      { @apply bg-gray-100    text-gray-600   border border-gray-200   dark:bg-gray-500/15   dark:text-gray-400   dark:border-gray-500/30;   }
 
 /* ── Sidebar ────────────────────────────────────────────── */
-/* Light mode sidebar */
+/* Soft pill-style nav with brand-color glow on active.
+   Replaced the older harsh `border-l-[3px]` accent line — that
+   read as a stray vertical hairline next to the (also) hard
+   right border of the aside. New active state uses a tinted
+   fill + subtle orange ring + drop-glow, which keeps the brand
+   accent without competing with the page's own borders. */
 .sidebar-icon {
   @apply flex items-center justify-center w-11 h-11 rounded-xl
          text-navy-400 hover:text-navy-900 hover:bg-navy-100
          transition-all duration-200 cursor-pointer;
 }
 .sidebar-icon.active {
-  @apply text-orange-500 bg-orange-50 border-l-[3px] border-orange-500;
+  @apply text-orange-500 bg-orange-50 ring-1 ring-inset ring-orange-500/30
+         shadow-[0_4px_16px_-4px_rgba(245,130,31,0.4)];
 }
 
 /* Dark mode sidebar */
@@ -166,7 +172,8 @@
   @apply text-navy-300 hover:text-white hover:bg-white/10;
 }
 :is(.dark .sidebar-icon.active) {
-  @apply text-orange-400 bg-orange-500/20 border-l-[3px] border-orange-400;
+  @apply text-orange-400 bg-orange-500/15 ring-1 ring-inset ring-orange-400/40
+         shadow-[0_4px_20px_-4px_rgba(245,130,31,0.6)];
 }
 
 /* ── Gradient text for ".ai" ────────────────────────────── */
@@ -253,6 +260,8 @@ html.theme-switching *::after {
   --wm-port-label:  rgba(30,64,175,0.85);
   --wm-label-text:  rgba(15,23,42,0.85);
   --wm-dot-stroke:  #FFFFFF;
+  --wm-panel-bg:    linear-gradient(180deg, #FAFCFF 0%, #F1F6FC 50%, #E9F1FA 100%);
+  background:       var(--wm-panel-bg);
 }
 .dark .world-map-panel {
   --wm-land:        #132044;
@@ -264,6 +273,7 @@ html.theme-switching *::after {
   --wm-port-label:  rgba(0,180,196,0.70);
   --wm-label-text:  rgba(255,255,255,0.85);
   --wm-dot-stroke:  rgba(255,255,255,0.60);
+  --wm-panel-bg:    linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%);
 }
 
 /* Sidebar route map (light defaults) */

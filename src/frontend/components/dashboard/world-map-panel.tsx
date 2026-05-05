@@ -13,7 +13,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Ship, Plane, X, ZoomIn, ZoomOut, Maximize2, MapPin, ArrowRight } from "lucide-react";
 import type { ShipmentStatus, ShipmentType } from "@prisma/client";
-import { useTheme } from "@/frontend/theme-provider";
 import { getCoordinates } from "@/lib/port-coordinates";
 
 /* ── World topology URL (Natural Earth 110m) ── */
@@ -72,18 +71,13 @@ function getStatusText(status: ShipmentStatus): string {
   return map[status] ?? status.replace(/_/g, " ");
 }
 
-/* Map colours live in globals.css under `.world-map-panel` and
- * `.dark .world-map-panel` — CSS variables flip the moment the dark
- * class toggles on <html>, which is what the View Transitions API
- * captures. Doing this in JS would race the snapshot.
- *
- * The only thing we still derive in JS is the panel background — it's
- * a multi-stop gradient, easier as inline style and theme-keyed below.
+/* All map colours — including the panel background gradient — now
+ * live in globals.css under `.world-map-panel` and `.dark .world-map-panel`.
+ * CSS variables flip the moment the dark class toggles on <html>, so
+ * the panel background swaps with the rest of the dashboard instead of
+ * being stuck on the React-state default until hydration completes
+ * (which is what caused the "mixed mode" flash on dashboard refresh).
  */
-const PANEL_BG = {
-  dark:  "linear-gradient(180deg, #0A1428 0%, #060E1E 50%, #040A16 100%)",
-  light: "linear-gradient(180deg, #FAFCFF 0%, #F1F6FC 50%, #E9F1FA 100%)",
-} as const;
 
 export function WorldMapPanel({ shipments }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -92,10 +86,8 @@ export function WorldMapPanel({ shipments }: Props) {
     coordinates: [10, 10],
     zoom: 1,
   });
-  const { theme } = useTheme();
 
   useEffect(() => { setMounted(true); }, []);
-  const panelBg = theme === "dark" ? PANEL_BG.dark : PANEL_BG.light;
 
   const handleZoomIn = useCallback(() => {
     setPosition((pos) => ({ ...pos, zoom: Math.min(pos.zoom * 1.5, 8) }));
@@ -123,12 +115,7 @@ export function WorldMapPanel({ shipments }: Props) {
   const dotScale = 1 / Math.sqrt(position.zoom);
 
   return (
-    <div
-      className="world-map-panel relative w-full h-full overflow-hidden flex items-center justify-center"
-      style={{
-        background: panelBg,
-      }}
-    >
+    <div className="world-map-panel relative w-full h-full overflow-hidden flex items-center justify-center">
       {/* Grid removed by design — keep the map clean and let the shipment
           dots and routes be the only visual rhythm on the canvas. */}
 
