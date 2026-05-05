@@ -31,7 +31,7 @@ export default async function DashboardPage() {
     orderBy: [{ isFavorite: "desc" }, { updatedAt: "desc" }],
     take: 50,
     include: {
-      events: {
+      trackingEvents: {
         orderBy: { eventDate: "asc" },
         select: { location: true, eventDate: true },
       },
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
       route.push([c.lng, c.lat]);
     };
     pushIfKnown(s.origin);
-    for (const ev of s.events) pushIfKnown(ev.location);
+    for (const ev of s.trackingEvents) pushIfKnown(ev.location);
     pushIfKnown(s.destination);
 
     // For SEA shipments, expand each pair of consecutive port stops
