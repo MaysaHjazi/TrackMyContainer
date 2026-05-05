@@ -136,11 +136,12 @@ function DarkAnimatedStat({ value, suffix, label, icon: Icon, delay }: {
 }
 
 function DarkHero({
-  query, setQuery, loading, error, setError, handleSearch, starsRef,
+  query, setQuery, loading, error, setError, handleSearch, goToLogin, starsRef,
 }: {
   query: string; setQuery: (s: string) => void;
   loading: boolean; error: string; setError: (s: string) => void;
   handleSearch: (e: React.FormEvent) => void;
+  goToLogin: () => void;
   starsRef: React.RefObject<HTMLCanvasElement | null>;
 }) {
   return (
@@ -256,18 +257,23 @@ function DarkHero({
               variants={fadeUp} initial="hidden" animate="visible" custom={0.6}
               onSubmit={handleSearch} className="mb-4"
             >
-              <div className="relative flex items-center w-full max-w-xl rounded-2xl p-1.5
+              <div
+                onClick={goToLogin}
+                className="relative flex items-center w-full max-w-xl rounded-2xl p-1.5
                               border-[1.5px] border-white/12 bg-white/[0.02] backdrop-blur-sm
                               focus-within:border-orange-400/60
                               focus-within:shadow-[0_0_40px_rgba(251,146,60,0.1)]
-                              transition-all duration-300">
+                              transition-all duration-300 cursor-pointer">
                 <Search size={18} className="ml-4 flex-shrink-0 text-white/40" />
                 <input
                   type="text" value={query}
+                  readOnly
+                  onFocus={goToLogin}
+                  onClick={goToLogin}
                   onChange={(e) => { setQuery(e.target.value); setError(""); }}
                   placeholder="Enter container number or waybill"
                   className="flex-1 bg-transparent py-3 px-4 text-[14px] font-sans text-white
-                             placeholder:text-white/35 focus:outline-none"
+                             placeholder:text-white/35 focus:outline-none cursor-pointer"
                   autoComplete="off" spellCheck={false}
                 />
                 <button type="submit" disabled={loading}
@@ -402,11 +408,12 @@ function LightAnimatedStat({ value, suffix, label, icon: Icon, delay }: {
 }
 
 function LightHero({
-  query, setQuery, loading, error, setError, handleSearch,
+  query, setQuery, loading, error, setError, handleSearch, goToLogin,
 }: {
   query: string; setQuery: (s: string) => void;
   loading: boolean; error: string; setError: (s: string) => void;
   handleSearch: (e: React.FormEvent) => void;
+  goToLogin: () => void;
 }) {
   return (
     <section className="relative overflow-x-clip bg-[#F5F7FA] flex items-center
@@ -508,18 +515,23 @@ function LightHero({
               variants={fadeUp} initial="hidden" animate="visible" custom={0.6}
               onSubmit={handleSearch} className="mb-4"
             >
-              <div className="relative flex items-center w-full max-w-xl rounded-2xl p-1.5
+              <div
+                onClick={goToLogin}
+                className="relative flex items-center w-full max-w-xl rounded-2xl p-1.5
                               border-[1.5px] border-[#E5E7EB] bg-white/60 backdrop-blur-sm
                               focus-within:border-[#FF6A00]
                               focus-within:shadow-[0_8px_24px_rgba(255,106,0,0.08)]
-                              transition-all duration-300">
+                              transition-all duration-300 cursor-pointer">
                 <Search size={18} className="ml-4 flex-shrink-0 text-[#9CA3AF]" />
                 <input
                   type="text" value={query}
+                  readOnly
+                  onFocus={goToLogin}
+                  onClick={goToLogin}
                   onChange={(e) => { setQuery(e.target.value); setError(""); }}
                   placeholder="Enter container number or waybill"
                   className="flex-1 bg-transparent py-3 px-4 text-[14px] text-[#1F2937]
-                             placeholder:text-[#9CA3AF] focus:outline-none"
+                             placeholder:text-[#9CA3AF] focus:outline-none cursor-pointer"
                   autoComplete="off" spellCheck={false}
                 />
                 <button type="submit" disabled={loading}
@@ -629,16 +641,20 @@ export function Hero() {
     return () => window.removeEventListener("resize", drawStars);
   }, [drawStars, isDark]);
 
+  // Both the search box and the Track Shipment button funnel the user to
+  // /login — tracking requires an account, and we want the click anywhere
+  // on the search row to act as the call-to-action.
+  const goToLogin = useCallback(() => {
+    setLoading(true);
+    router.push("/login");
+  }, [router]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) { setError("Please enter a container or AWB number"); return; }
-    setError("");
-    setLoading(true);
-    router.push(`/track/${encodeURIComponent(trimmed.toUpperCase())}`);
+    goToLogin();
   };
 
-  const shared = { query, setQuery, loading, error, setError, handleSearch };
+  const shared = { query, setQuery, loading, error, setError, handleSearch, goToLogin };
 
   return isDark
     ? <DarkHero  {...shared} starsRef={starsRef} />
