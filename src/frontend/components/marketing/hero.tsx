@@ -151,15 +151,25 @@ function DarkHero({
           so there's no visible "band" where the header sits. */}
       <div className="absolute inset-0 pointer-events-none"
         style={{ background: "radial-gradient(ellipse at 55% 55%, #0A1428 0%, #060B1A 70%, #040810 100%)" }} />
-      {/* Star canvas — with gentle twinkle fade pulse */}
-      <canvas
+      {/* Star canvas — fades up gently instead of snapping in. The
+          250-star single-frame draw was the single biggest source of
+          the dark-mode "everything appears at once" pop. */}
+      <motion.canvas
         ref={starsRef}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.6, ease: "easeOut", delay: 0.15 }}
         className="absolute inset-0 w-full h-full pointer-events-none animate-star-twinkle"
         style={{ transition: "none" }}
       />
-      {/* Nebulas — includes a top-wide glow so the header area has the same
-          atmospheric depth as the middle of the hero (no darker "band"). */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {/* Nebulas — same gentle fade-in so the coloured glow doesn't
+          flash on with the canvas behind it. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.4, ease: "easeOut", delay: 0.25 }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
         {/* Top-spanning subtle lift — fills the header area with depth */}
         <div className="absolute -top-[20%] left-1/2 -translate-x-1/2 w-[140%] h-[400px] rounded-[50%] blur-[120px] opacity-[0.05]"
           style={{ background: "radial-gradient(ellipse, #1B3A6E 0%, #0D1B3E 50%, transparent 75%)" }} />
@@ -171,15 +181,22 @@ function DarkHero({
           style={{ background: "radial-gradient(ellipse, #1B3A6E 0%, #0D1B3E 50%, transparent 70%)" }} />
         <div className="absolute bottom-[0%] right-[30%] w-[500px] h-[300px] rounded-full blur-[120px] opacity-[0.04]"
           style={{ background: "radial-gradient(ellipse, #F5821F 0%, transparent 70%)" }} />
-      </div>
+      </motion.div>
 
-      {/* Globe — balanced size, positioned right but not crammed */}
-      <div className="absolute top-0 right-[2%] w-[50%] h-full hidden lg:block z-10"
+      {/* Globe — balanced size, positioned right but not crammed.
+          Wrapper fades + scales in so the WebGL canvas materialises
+          rather than popping into existence the moment Suspense
+          resolves. */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
+        className="absolute top-0 right-[2%] w-[50%] h-full hidden lg:block z-10"
         style={{ maskImage: "linear-gradient(to right, transparent 0%, black 25%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 25%)" }}>
         <Suspense fallback={null}>
           <HeroGlobe />
         </Suspense>
-      </div>
+      </motion.div>
 
       <div className="absolute inset-0 pointer-events-none hidden lg:block">
         <DarkFloatingCards />
