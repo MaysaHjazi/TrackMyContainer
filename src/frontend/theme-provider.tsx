@@ -36,16 +36,16 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Start as "light" on the server; the init script already set the real class
-  // before hydration, and the effect below reads it back into React state.
-  const [theme, setThemeState] = useState<Theme>("light");
-
-  useEffect(() => {
-    const isDark =
-      typeof document !== "undefined" &&
-      document.documentElement.classList.contains("dark");
-    setThemeState(isDark ? "dark" : "light");
-  }, []);
+  // Read the initial theme synchronously from the html class — the
+  // pre-hydration init script in <head> already set this before React
+  // mounts, so the very first render of children sees the correct theme.
+  // Without this, children mount as "light" → useEffect flips to "dark"
+  // → entire subtree re-mounts and animations replay abruptly on a fresh
+  // dark-mode page load.
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof document === "undefined") return "light";
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  });
 
   const setTheme = useCallback((next: Theme) => {
     try {

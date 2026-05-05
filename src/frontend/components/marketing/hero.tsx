@@ -183,20 +183,25 @@ function DarkHero({
           style={{ background: "radial-gradient(ellipse, #F5821F 0%, transparent 70%)" }} />
       </motion.div>
 
-      {/* Globe — balanced size, positioned right but not crammed.
-          Wrapper fades + scales in so the WebGL canvas materialises
-          rather than popping into existence the moment Suspense
-          resolves. */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
+      {/* Globe — the motion wrapper sits INSIDE Suspense so its mount
+          (and therefore its fade-in) is gated on textures + WebGL
+          actually being ready. With it on the outside, the wrapper
+          finished its fade before the globe even loaded — which is
+          exactly the "pop in" the user reported. */}
+      <div
         className="absolute top-0 right-[2%] w-[50%] h-full hidden lg:block z-10"
         style={{ maskImage: "linear-gradient(to right, transparent 0%, black 25%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 25%)" }}>
         <Suspense fallback={null}>
-          <HeroGlobe />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full h-full"
+          >
+            <HeroGlobe />
+          </motion.div>
         </Suspense>
-      </motion.div>
+      </div>
 
       <div className="absolute inset-0 pointer-events-none hidden lg:block">
         <DarkFloatingCards />
@@ -445,11 +450,19 @@ function LightHero({
           style={{ background: "linear-gradient(to top, #EEF2F6 0%, transparent 100%)" }} />
       </div>
 
-      {/* Globe — balanced size, positioned right but not crammed */}
+      {/* Globe — motion wrapper inside Suspense so it fades in only
+          after textures + WebGL are ready (matches dark hero treatment). */}
       <div className="absolute top-0 right-[2%] w-[50%] h-full hidden lg:block z-10"
         style={{ maskImage: "linear-gradient(to right, transparent 0%, black 25%)", WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 25%)" }}>
         <Suspense fallback={null}>
-          <HeroGlobe />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full h-full"
+          >
+            <HeroGlobe />
+          </motion.div>
         </Suspense>
       </div>
 
