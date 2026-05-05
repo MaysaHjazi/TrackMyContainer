@@ -21,19 +21,46 @@ export default async function DashboardPage() {
   const plan = user.subscription?.plan ?? "FREE";
   const isPro = plan === "PRO" || plan === "CUSTOM";
 
-  // ── Fetch user's shipments from DB ──
-  // Include delivered shipments (isActive=false) so they still show in stats
-  // and the right sidebar — they're just hidden from the map below.
+  // ── Fetch user's shipments from DB, including their tracking events
+  // so the map can draw the REAL multi-port route the container has
+  // taken (Ningbo → Rotterdam → Algeciras → ...) rather than a fake
+  // straight line from origin to destination. */
   const dbShipments = await prisma.shipment.findMany({
     where: { userId: user.id },
     orderBy: [{ isFavorite: "desc" }, { updatedAt: "desc" }],
     take: 50,
+    include: {
+      events: {
+        orderBy: { eventDate: "asc" },
+        select: { location: true, eventDate: true },
+      },
+    },
   });
 
-  // ── Convert to dashboard format with coordinates ──
+  // ── Convert to dashboard format with coordinates + route waypoints ──
   const shipments = dbShipments.map((s) => {
     // Use currentLocation > destination > origin to pick map position
     const coords = getCoordinates(s.currentLocation || s.destination || s.origin);
+
+    // Build the actual route the container has travelled: walk through
+    // tracking events in chronological order, keep each unique geocoded
+    // location once (collapse consecutive duplicates), and bookend with
+    // origin / destination if they're missing from the event stream.
+    const seen = new Set<string>();
+    const route: [number, number][] = [];
+    const pushIfKnown = (loc: string | null | undefined) => {
+      if (!loc) return;
+      const key = loc.toLowerCase().trim();
+      if (seen.has(key)) return;
+      const c = getCoordinates(loc);
+      if (c.lat === 0 && c.lng === 0) return;
+      seen.add(key);
+      route.push([c.lng, c.lat]);
+    };
+    pushIfKnown(s.origin);
+    for (const ev of s.events) pushIfKnown(ev.location);
+    pushIfKnown(s.destination);
+
     return {
       id: s.id,
       trackingNumber: s.trackingNumber,
@@ -46,6 +73,7 @@ export default async function DashboardPage() {
       etaDate: s.etaDate?.toISOString() ?? null,   // serialize Date → string for client
       lat: coords.lat,
       lng: coords.lng,
+      route,                                        // NEW: actual waypoints
     };
   });
 

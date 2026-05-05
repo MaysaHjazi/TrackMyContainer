@@ -30,6 +30,11 @@ interface ShipmentDot {
   currentLocation?: string;
   lat: number;
   lng: number;
+  /** Real route waypoints derived from tracking events (geocoded ports
+   *  in chronological order). Used to draw a multi-segment polyline so
+   *  the map shows the actual path the container has taken instead of
+   *  a straight great-circle arc that ignores stopovers. */
+  route?: [number, number][];
 }
 
 interface Props {
@@ -197,26 +202,40 @@ export function WorldMapPanel({ shipments }: Props) {
             }
           </Geographies>
 
-          {/* ── Real shipment routes (origin → destination) ─────────
-              ONE line per active shipment that has both an origin and a
-              destination we can geocode. Sea = blue palette, Air =
-              orange palette. No decorative/random arcs — only what's
-              actually moving in your account.
-              DELIVERED and AT_PORT (= arrived at destination port) are
-              excluded — those shipments are done as far as the map is
-              concerned. */}
+          {/* ── Real shipment routes ─────────
+              We draw the ACTUAL multi-leg path the container has taken
+              (and is taking) by stitching together every geocoded
+              tracking event in chronological order: e.g. Ningbo →
+              Rotterdam → Algeciras → Casablanca rather than a fake
+              straight line. Falls back to origin↔destination if the
+              shipment has no event history yet. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
-              .map((s) => {
-                const from = toLngLat(s.origin);
-                const to   = toLngLat(s.destination);
-                if (!from || !to) return null;
+              .flatMap((s) => {
                 const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
-                return (
+
+                // Prefer the event-derived route if we have at least
+                // two waypoints; otherwise fall back to the straight
+                // origin → destination arc so freshly-added shipments
+                // still show something.
+                const waypoints: [number, number][] = (s.route && s.route.length >= 2)
+                  ? s.route
+                  : (() => {
+                      const a = toLngLat(s.origin);
+                      const b = toLngLat(s.destination);
+                      return a && b ? [a, b] : [];
+                    })();
+
+                if (waypoints.length < 2) return [];
+
+                // One <Line> per consecutive pair → react-simple-maps
+                // renders each as a smooth great-circle segment, so
+                // the polyline reads as a curved real-world ship route.
+                return waypoints.slice(1).map((to, i) => (
                   <Line
-                    key={`route-${s.id}`}
-                    from={from}
+                    key={`route-${s.id}-${i}`}
+                    from={waypoints[i]}
                     to={to}
                     stroke={stroke}
                     strokeWidth={1.5 / position.zoom}
@@ -224,7 +243,27 @@ export function WorldMapPanel({ shipments }: Props) {
                     strokeDasharray="8 4"
                     opacity={0.85}
                   />
-                );
+                ));
+              })}
+
+          {/* ── Intermediate waypoint dots ──
+              Every transshipment / port-of-call between origin and
+              destination gets a small dot in the shipment's colour
+              so the reader can see the actual leg-by-leg path. */}
+          {mounted &&
+            shipments
+              .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
+              .flatMap((s) => {
+                const route = s.route ?? [];
+                if (route.length < 3) return []; // need at least one intermediate waypoint
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                // Drop first + last (those are origin / destination, drawn separately below)
+                return route.slice(1, -1).map((pt, i) => (
+                  <Marker key={`wp-${s.id}-${i}`} coordinates={pt}>
+                    <circle r={3 * dotScale} fill={color} opacity={0.55} />
+                    <circle r={1.4 * dotScale} fill={color} stroke="#fff" strokeWidth={0.8 * dotScale} />
+                  </Marker>
+                ));
               })}
 
           {/* ── Origin & destination labels per shipment ──
