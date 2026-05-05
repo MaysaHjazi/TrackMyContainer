@@ -61,6 +61,9 @@ export default async function RootLayout({
   const initialTheme: "light" | "dark" =
     themeFromCookie === "dark" ? "dark" : "light";
 
+  // eslint-disable-next-line no-console
+  console.log("[layout] tmc-theme cookie =", themeFromCookie, "→", initialTheme);
+
   return (
     <html
       lang="en"
