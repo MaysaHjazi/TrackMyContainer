@@ -134,6 +134,83 @@ const PORTS: Record<string, Coords> = {
   "umm qasr":       { lat: 29.9, lng: 48.0 },   // Iraq
   "strait of malacca": { lat: 3.0, lng: 100.0 },
   "in transit":    { lat: 0.0, lng: 30.0 },
+
+  // ── Asia (extra coverage) ──
+  "jakarta":       { lat: -6.2, lng: 106.8 },
+  "surabaya":      { lat: -7.2, lng: 112.7 },
+  "ho chi minh":   { lat: 10.8, lng: 106.7 },
+  "haiphong":      { lat: 20.9, lng: 106.7 },
+  "chittagong":    { lat: 22.3, lng: 91.8 },
+  "karachi":       { lat: 24.9, lng: 67.0 },
+  "chennai":       { lat: 13.1, lng: 80.3 },
+  "kolkata":       { lat: 22.6, lng: 88.4 },
+  "tuticorin":     { lat: 8.8, lng: 78.1 },
+  "yangon":        { lat: 16.8, lng: 96.2 },
+  "phnom penh":    { lat: 11.6, lng: 104.9 },
+  "fuzhou":        { lat: 26.1, lng: 119.3 },
+  "cebu":          { lat: 10.3, lng: 123.9 },
+
+  // ── Middle East / North Africa extra ──
+  "cairo":         { lat: 30.0, lng: 31.2 },
+  "port said":     { lat: 31.3, lng: 32.3 },
+  "ain sokhna":    { lat: 29.6, lng: 32.3 },
+  "damietta":      { lat: 31.4, lng: 31.8 },
+  "aqaba":         { lat: 29.5, lng: 35.0 },
+  "haifa":         { lat: 32.8, lng: 35.0 },
+  "ashdod":        { lat: 31.8, lng: 34.6 },
+  "beirut":        { lat: 33.9, lng: 35.5 },
+  "lattakia":      { lat: 35.5, lng: 35.8 },
+  "mersin":        { lat: 36.8, lng: 34.6 },
+  "kuwait":        { lat: 29.4, lng: 47.9 },
+  "doha port":     { lat: 25.3, lng: 51.5 },
+  "muscat":        { lat: 23.6, lng: 58.6 },
+  "tunis":         { lat: 36.8, lng: 10.2 },
+  "algiers":       { lat: 36.8, lng: 3.1 },
+  "tangier":       { lat: 35.8, lng: -5.8 },
+
+  // ── Europe extra ──
+  "marseille":     { lat: 43.3, lng: 5.4 },
+  "naples":        { lat: 40.8, lng: 14.3 },
+  "gioia tauro":   { lat: 38.4, lng: 15.9 },
+  "trieste":       { lat: 45.6, lng: 13.8 },
+  "bilbao":        { lat: 43.3, lng: -3.0 },
+  "lisbon":        { lat: 38.7, lng: -9.1 },
+  "porto":         { lat: 41.1, lng: -8.6 },
+  "constanta":     { lat: 44.2, lng: 28.6 },
+  "gdansk":        { lat: 54.4, lng: 18.7 },
+  "klaipeda":      { lat: 55.7, lng: 21.1 },
+  "helsinki":      { lat: 60.2, lng: 24.9 },
+  "saint petersburg": { lat: 59.9, lng: 30.3 },
+  "novorossiysk":  { lat: 44.7, lng: 37.8 },
+
+  // ── Americas extra ──
+  "seattle":       { lat: 47.6, lng: -122.3 },
+  "oakland":       { lat: 37.8, lng: -122.3 },
+  "manzanillo":    { lat: 19.0, lng: -104.3 }, // Mexico
+  "veracruz":      { lat: 19.2, lng: -96.1 },
+  "altamira":      { lat: 22.4, lng: -97.9 },
+  "kingston":      { lat: 18.0, lng: -76.8 },
+  "freeport":      { lat: 26.5, lng: -78.7 },
+  "cartagena":     { lat: 10.4, lng: -75.5 },
+  "puerto cabello": { lat: 10.5, lng: -68.0 },
+  "balboa":        { lat: 9.0, lng: -79.6 },
+  "san antonio":   { lat: -33.6, lng: -71.6 }, // Chile
+  "valparaiso":    { lat: -33.0, lng: -71.6 },
+  "iquique":       { lat: -20.2, lng: -70.1 },
+
+  // ── Africa extra ──
+  "tema port":     { lat: 5.6, lng: 0.0 },
+  "luanda":        { lat: -8.8, lng: 13.2 },
+  "walvis bay":    { lat: -22.9, lng: 14.5 },
+  "cape town":     { lat: -33.9, lng: 18.4 },
+  "port elizabeth": { lat: -33.9, lng: 25.6 },
+  "toamasina":     { lat: -18.1, lng: 49.4 },
+
+  // ── Oceania ──
+  "melbourne":     { lat: -37.8, lng: 144.9 },
+  "brisbane":      { lat: -27.4, lng: 153.0 },
+  "auckland":      { lat: -36.8, lng: 174.8 },
+  "tauranga":      { lat: -37.7, lng: 176.2 },
 };
 
 /**

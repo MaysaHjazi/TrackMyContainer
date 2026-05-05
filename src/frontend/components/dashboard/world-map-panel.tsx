@@ -216,10 +216,31 @@ export function WorldMapPanel({ shipments }: Props) {
               ? "rgba(239,68,68,0.6)"
               : isSea ? "rgba(0,180,196,0.6)" : "rgba(245,130,31,0.6)";
 
+            // Pick the best coordinate we can: the geocoded current
+            // position if we have one, otherwise the midpoint between
+            // origin and destination, otherwise whichever endpoint is
+            // known. This guarantees every newly-added shipment shows
+            // up on the map even before the worker fills in lat/lng.
+            let markerCoords: [number, number] | null = null;
+            if (s.lng !== 0 || s.lat !== 0) {
+              markerCoords = [s.lng, s.lat];
+            } else {
+              const originPt = toLngLat(s.origin);
+              const destPt   = toLngLat(s.destination);
+              if (originPt && destPt) {
+                markerCoords = [(originPt[0] + destPt[0]) / 2, (originPt[1] + destPt[1]) / 2];
+              } else if (originPt) {
+                markerCoords = originPt;
+              } else if (destPt) {
+                markerCoords = destPt;
+              }
+            }
+            if (!markerCoords) return null;
+
             return (
               <Marker
                 key={s.id}
-                coordinates={[s.lng, s.lat]}
+                coordinates={markerCoords}
                 onClick={() => handleZoomToShipment(s)}
                 onMouseEnter={() => setActiveShipment(s)}
                 onMouseLeave={() => setActiveShipment(null)}

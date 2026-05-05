@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { Navigation, Ship } from "lucide-react";
 import { getCoordinates } from "@/lib/port-coordinates";
-import { useTheme } from "@/frontend/theme-provider";
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -32,9 +31,6 @@ interface Props {
 }
 
 export function RouteMap({ origin, destination, currentLocation }: Props) {
-  const { theme } = useTheme();
-  const isDark    = theme === "dark";
-
   // react-simple-maps computes SVG path `d` attributes using d3-geo, which
   // can produce floating-point strings that differ between the server and
   // the client (different Node/V8 vs. browser rounding). To avoid a React
@@ -63,24 +59,11 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
     );
   }
 
-  // Container/header chrome stays Tailwind class-based (the .dark
-  // selector picks up the right tokens at the cascade level). Land
-  // and stroke colours move to CSS variables in globals.css under
-  // `.route-map` / `.dark .route-map` so SVG repaints the instant
-  // the dark class flips on <html> — same trick as the world map.
-  const palette = isDark
-    ? {
-        container:  "bg-navy-950 border-navy-800",
-        headerBg:   "border-navy-800 bg-navy-900/50",
-        headerText: "text-navy-200",
-        legendBg:   "border-navy-800 bg-navy-900/50 text-navy-400",
-      }
-    : {
-        container:  "bg-white border-navy-200",
-        headerBg:   "border-navy-100 bg-navy-50/60",
-        headerText: "text-navy-700",
-        legendBg:   "border-navy-100 bg-navy-50/60 text-navy-500",
-      };
+  // All theme styling is Tailwind-class-driven (with `dark:` variants)
+  // so the map flips synchronously with the html.dark class, same as
+  // the dashboard world map. Previously a useTheme()-derived palette
+  // read 'light' on first render and produced a "mixed mode" flash on
+  // dark-mode dashboard refreshes.
 
   // Accent colors — same for both themes (brand palette)
   const ORIGIN_C  = "#00B4C4";  // teal
@@ -96,11 +79,16 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
   const scale   = Math.max(110, Math.min(220, 8000 / span));
 
   return (
-    <div className={`route-map rounded-xl border overflow-hidden shadow-sm ${palette.container}`}>
+    <div className="route-map rounded-xl border overflow-hidden shadow-sm
+                    bg-white border-navy-200
+                    dark:bg-navy-950 dark:border-navy-800">
       {/* Header */}
-      <div className={`flex items-center gap-2 px-4 py-2 border-b ${palette.headerBg}`}>
+      <div className="flex items-center gap-2 px-4 py-2 border-b
+                      border-navy-100 bg-navy-50/60
+                      dark:border-navy-800 dark:bg-navy-900/50">
         <Navigation size={14} className="text-orange-500 dark:text-orange-400" />
-        <span className={`text-xs font-bold uppercase tracking-wider ${palette.headerText}`}>
+        <span className="text-xs font-bold uppercase tracking-wider
+                         text-navy-700 dark:text-navy-200">
           Route Map
         </span>
       </div>
@@ -202,7 +190,9 @@ export function RouteMap({ origin, destination, currentLocation }: Props) {
       )}
 
       {/* Legend */}
-      <div className={`flex flex-wrap items-center gap-3 px-4 py-2 border-t text-xs ${palette.legendBg}`}>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-t text-xs
+                      border-navy-100 bg-navy-50/60 text-navy-500
+                      dark:border-navy-800 dark:bg-navy-900/50 dark:text-navy-400">
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ORIGIN_C }} />
           Origin
