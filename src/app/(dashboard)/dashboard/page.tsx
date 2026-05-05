@@ -42,19 +42,28 @@ export default async function DashboardPage() {
     // Use currentLocation > destination > origin to pick map position
     const coords = getCoordinates(s.currentLocation || s.destination || s.origin);
 
-    // Build the actual route the container has travelled: walk through
-    // tracking events in chronological order, keep each unique geocoded
-    // location once (collapse consecutive duplicates), and bookend with
-    // origin / destination if they're missing from the event stream.
-    const seen = new Set<string>();
+    // Build the actual route the container has travelled.
+    //
+    // Rules (per the user's spec):
+    //   1. Use the full tracking history events.
+    //   2. Sort by date ASC — already done by the Prisma query above.
+    //   3. Extract the location sequence from events.
+    //   4. Remove ONLY *consecutive* duplicates (Algeciras-arrived then
+    //      Algeciras-departed = one stop). Do NOT global-dedup —
+    //      a true A→B→A→C path must keep both A entries.
+    //   5. Bookend with origin / destination if they aren't already
+    //      the first / last entries in the event stream.
+    //   6. Skip locations we can't geocode.
     const route: [number, number][] = [];
+    const routeLabels: string[] = []; // mirrors `route`, used to detect consecutive dupes
     const pushIfKnown = (loc: string | null | undefined) => {
       if (!loc) return;
-      const key = loc.toLowerCase().trim();
-      if (seen.has(key)) return;
+      const normalized = loc.toLowerCase().trim();
+      // Collapse only when the previous entry is the same port.
+      if (routeLabels[routeLabels.length - 1] === normalized) return;
       const c = getCoordinates(loc);
       if (c.lat === 0 && c.lng === 0) return;
-      seen.add(key);
+      routeLabels.push(normalized);
       route.push([c.lng, c.lat]);
     };
     pushIfKnown(s.origin);
