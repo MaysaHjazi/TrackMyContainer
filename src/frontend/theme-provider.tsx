@@ -1,24 +1,28 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
 
 /**
- * Minimal, dependency-free theme provider.
- * Connects to the existing `.dark` CSS variable block in globals.css
- * and the Tailwind `darkMode: ["class"]` config.
+ * Theme provider with cookie-backed persistence.
  *
- * Strategy:
- *  - On mount, read saved theme from localStorage (`tmc-theme`) or fall back to system pref.
- *  - Apply/remove the `dark` class on <html>.
- *  - Persist changes back to localStorage.
+ * Why cookie (not localStorage):
+ *   The root layout reads the cookie on the SERVER so the SSR HTML
+ *   ships with the right `dark` class on <html> AND the right Hero
+ *   variant in the markup. With localStorage the server has no way
+ *   to know the visitor's preference — it always emits LightHero,
+ *   the client flips to DarkHero a frame later, and the page "pops".
  *
- * Exports `themeInitScript` which must run BEFORE hydration (in <head>)
- * to prevent a flash of the wrong theme.
+ * The pre-hydration init script is still injected in <head> as a
+ * safety net for users who arrive with the legacy localStorage value
+ * but no cookie yet (it migrates them) and to honour OS preference
+ * when no choice has been persisted.
  */
 
 export type Theme = "light" | "dark";
 
-const STORAGE_KEY = "tmc-theme";
+export const THEME_COOKIE = "tmc-theme";
+const STORAGE_KEY = "tmc-theme"; // legacy — kept for migration only
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 
 type ThemeContextValue = {
   theme: Theme;
@@ -35,19 +39,27 @@ function applyTheme(theme: Theme) {
   else root.classList.remove("dark");
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Read the initial theme synchronously from the html class — the
-  // pre-hydration init script in <head> already set this before React
-  // mounts, so the very first render of children sees the correct theme.
-  // Without this, children mount as "light" → useEffect flips to "dark"
-  // → entire subtree re-mounts and animations replay abruptly on a fresh
-  // dark-mode page load.
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof document === "undefined") return "light";
-    return document.documentElement.classList.contains("dark") ? "dark" : "light";
-  });
+function writeCookie(theme: Theme) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;
+}
+
+export function ThemeProvider({
+  initialTheme = "light",
+  children,
+}: {
+  initialTheme?: Theme;
+  children: React.ReactNode;
+}) {
+  // initialTheme is provided by the server (read from cookie in
+  // app/layout.tsx). SSR and client therefore agree on frame zero —
+  // no remount, no animation replay.
+  const [theme, setThemeState] = useState<Theme>(initialTheme);
 
   const setTheme = useCallback((next: Theme) => {
+    writeCookie(next);
+    // Keep the legacy localStorage key in sync so any older client code
+    // reading it still sees the current value.
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
@@ -65,18 +77,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Light-touch crossfade approach (no full-page snapshot freeze):
-    //   1. Add a transient `.theme-switching` class on <html>.
-    //   2. CSS rule for that class enables ~180ms color/fill/stroke
-    //      transitions on every element.
-    //   3. Flip the dark class. CSS variables (map land, borders,
-    //      routes, body bg, card bg, text…) interpolate smoothly
-    //      between their old and new values.
-    //   4. After 220ms, drop the `.theme-switching` class so normal
-    //      hover/state transitions stay snappy.
-    //
-    // No setTimeout throttling, no React render race, and the map
-    // animates because its colours all live in CSS variables.
+    // Light-touch crossfade: enable transient color transitions on every
+    // element while the dark class flips, then strip them off so normal
+    // hover states stay snappy.
     const root = document.documentElement;
     if (!reducedMotion) root.classList.add("theme-switching");
 
@@ -115,16 +118,39 @@ export function useTheme() {
 }
 
 /**
- * Inline script injected in <head> via dangerouslySetInnerHTML to prevent FOUC.
- * Runs BEFORE React hydrates, reads the persisted choice, and applies the class.
+ * Inline script injected in <head> via dangerouslySetInnerHTML.
+ * Runs BEFORE React hydrates. Two jobs:
+ *   1. Migrate legacy localStorage value → cookie (so the very next
+ *      request hits the SSR cookie path and gets correct HTML).
+ *   2. Honour OS color-scheme preference for first-time visitors.
+ *   3. Make sure <html.dark> matches whatever theme will be active,
+ *      even if the visitor has no cookie yet.
  */
 export const themeInitScript = `
 (function () {
   try {
-    var stored = localStorage.getItem('${STORAGE_KEY}');
+    var cookieMatch = document.cookie.match(/(?:^|;\\s*)${THEME_COOKIE}=(\\w+)/);
+    var stored = cookieMatch && cookieMatch[1];
+
+    // Legacy migration: copy localStorage → cookie on the very first hit
+    // after this release, so the next refresh uses the SSR-cookie path.
+    if (!stored) {
+      try {
+        var legacy = localStorage.getItem('${STORAGE_KEY}');
+        if (legacy === 'dark' || legacy === 'light') {
+          stored = legacy;
+          document.cookie = '${THEME_COOKIE}=' + legacy + '; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax';
+        }
+      } catch (e) {}
+    }
+
     var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var theme = stored === 'dark' || stored === 'light' ? stored : (systemDark ? 'dark' : 'light');
+    var theme = stored === 'dark' || stored === 'light'
+      ? stored
+      : (systemDark ? 'dark' : 'light');
+
     if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   } catch (e) { /* ignore */ }
 })();
 `.trim();

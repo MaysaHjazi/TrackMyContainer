@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
-import { ThemeProvider, themeInitScript } from "@/frontend/theme-provider";
+import { ThemeProvider, themeInitScript, THEME_COOKIE } from "@/frontend/theme-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -46,15 +47,29 @@ export const viewport: Viewport = {
   themeColor: "#1B2B5E",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Read the persisted theme on the server so the SSR HTML already has
+  // the right `dark` class on <html> AND the right Hero variant inside.
+  // Without this, the server always emits LightHero, the client flips to
+  // DarkHero post-hydration, and the user sees the dark page "pop in".
+  const cookieStore = await cookies();
+  const themeFromCookie = cookieStore.get(THEME_COOKIE)?.value;
+  const initialTheme: "light" | "dark" =
+    themeFromCookie === "dark" ? "dark" : "light";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={initialTheme === "dark" ? "dark" : undefined}
+      suppressHydrationWarning
+    >
       <head>
-        {/* Pre-hydration theme init — must run before paint to avoid FOUC */}
+        {/* Pre-hydration theme init — keeps localStorage users (pre-cookie
+            release) on the right theme + handles OS-preference fallback. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         {/* Structured data */}
         <script
@@ -78,7 +93,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider initialTheme={initialTheme}>{children}</ThemeProvider>
       </body>
     </html>
   );
