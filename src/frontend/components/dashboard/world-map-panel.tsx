@@ -30,11 +30,16 @@ interface ShipmentDot {
   currentLocation?: string;
   lat: number;
   lng: number;
-  /** Real route waypoints derived from tracking events (geocoded ports
-   *  in chronological order). Used to draw a multi-segment polyline so
-   *  the map shows the actual path the container has taken instead of
-   *  a straight great-circle arc that ignores stopovers. */
+  /** Port-level waypoints derived from tracking events (geocoded ports
+   *  in chronological order). Used as marker positions. */
   route?: [number, number][];
+  /** Dense maritime polyline computed server-side via `searoute-ts`.
+   *  Each consecutive pair of port waypoints is expanded into the
+   *  actual ocean path (around continents, through Suez, along
+   *  coastlines), so SEA shipments don't render straight lines that
+   *  cut across land. AIR shipments leave this undefined and fall back
+   *  to the great-circle line between port waypoints. */
+  routePolyline?: [number, number][];
 }
 
 interface Props {
@@ -203,22 +208,38 @@ export function WorldMapPanel({ shipments }: Props) {
           </Geographies>
 
           {/* ── Real shipment routes ─────────
-              We draw the ACTUAL multi-leg path the container has taken
-              (and is taking) by stitching together every geocoded
-              tracking event in chronological order: e.g. Ningbo →
-              Rotterdam → Algeciras → Casablanca rather than a fake
-              straight line. Falls back to origin↔destination if the
-              shipment has no event history yet. */}
+              For SEA shipments we render the dense `routePolyline`
+              computed server-side via searoute-ts — that's the actual
+              ocean path that hugs coastlines and routes through Suez /
+              around the Cape, like ShipsGo's visualisation.
+              For AIR shipments (and as a fallback) we render
+              great-circle arcs between the port-level waypoints. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .flatMap((s) => {
                 const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
 
-                // Prefer the event-derived route if we have at least
-                // two waypoints; otherwise fall back to the straight
-                // origin → destination arc so freshly-added shipments
-                // still show something.
+                // Prefer the dense maritime polyline (SEA only) when
+                // available — it's many short segments approximating
+                // the real ocean route.
+                if (s.routePolyline && s.routePolyline.length >= 2) {
+                  return s.routePolyline.slice(1).map((to, i) => (
+                    <Line
+                      key={`route-${s.id}-${i}`}
+                      from={s.routePolyline![i]}
+                      to={to}
+                      stroke={stroke}
+                      strokeWidth={1.5 / position.zoom}
+                      strokeLinecap="round"
+                      opacity={0.9}
+                    />
+                  ));
+                }
+
+                // Fallback: stitch great-circles between port waypoints
+                // (used by AIR shipments and by SEA shipments where
+                // searoute couldn't resolve a path).
                 const waypoints: [number, number][] = (s.route && s.route.length >= 2)
                   ? s.route
                   : (() => {
@@ -229,9 +250,6 @@ export function WorldMapPanel({ shipments }: Props) {
 
                 if (waypoints.length < 2) return [];
 
-                // One <Line> per consecutive pair → react-simple-maps
-                // renders each as a smooth great-circle segment, so
-                // the polyline reads as a curved real-world ship route.
                 return waypoints.slice(1).map((to, i) => (
                   <Line
                     key={`route-${s.id}-${i}`}

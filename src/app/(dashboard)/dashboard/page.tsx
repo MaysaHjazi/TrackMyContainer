@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/backend/lib/db";
 import { DashboardContent } from "@/frontend/components/dashboard/dashboard-content";
 import { getCoordinates } from "@/lib/port-coordinates";
+import { seaRoute } from "searoute-ts";
 
 /**
  * Dashboard overview — real data from DB.
@@ -70,6 +71,43 @@ export default async function DashboardPage() {
     for (const ev of s.events) pushIfKnown(ev.location);
     pushIfKnown(s.destination);
 
+    // For SEA shipments, expand each pair of consecutive port stops
+    // into the actual maritime path using `searoute-ts` — a great-circle
+    // approximation routed around continents. The result is a polyline
+    // that follows real ocean lanes (around the Cape, through Suez,
+    // along the coast) instead of cutting straight across land.
+    //
+    // AIR shipments stay on the great-circle path — flights actually
+    // do go in straight arcs, so the existing rendering is correct.
+    let routePolyline: [number, number][] | undefined;
+    if (s.type === "SEA" && route.length >= 2) {
+      const polyline: [number, number][] = [];
+      for (let i = 0; i < route.length - 1; i++) {
+        const a = route[i];
+        const b = route[i + 1];
+        try {
+          const feature = seaRoute(
+            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: a } },
+            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: b } },
+          );
+          const segCoords = feature?.geometry?.coordinates as [number, number][] | undefined;
+          if (segCoords && segCoords.length > 1) {
+            // Append, but skip the duplicated junction point between segments
+            if (polyline.length === 0) polyline.push(...segCoords);
+            else polyline.push(...segCoords.slice(1));
+          } else {
+            // searoute couldn't resolve — fall back to straight pair
+            if (polyline.length === 0) polyline.push(a);
+            polyline.push(b);
+          }
+        } catch {
+          if (polyline.length === 0) polyline.push(a);
+          polyline.push(b);
+        }
+      }
+      routePolyline = polyline;
+    }
+
     return {
       id: s.id,
       trackingNumber: s.trackingNumber,
@@ -82,7 +120,8 @@ export default async function DashboardPage() {
       etaDate: s.etaDate?.toISOString() ?? null,   // serialize Date → string for client
       lat: coords.lat,
       lng: coords.lng,
-      route,                                        // NEW: actual waypoints
+      route,                                        // port-level waypoints (markers)
+      routePolyline,                                // dense maritime path (the line)
     };
   });
 
