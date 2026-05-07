@@ -145,28 +145,46 @@ export class JsonCargoProvider implements TrackingProvider {
     // Beacon, SeaCo) and could be on any carrier. JSONCargo's
     // `shipping_line` query param is required for accurate
     // lookups, so without a hint we'd get NOT_FOUND even on real,
-    // live shipments. Walk the major carriers in order; first
-    // success wins. Worst case is 6 calls — bounded, predictable,
-    // and only paid on `add`/poll for containers we couldn't
-    // pre-identify.
-    let lastFailure: ProviderResult | null = null;
-    for (const carrier of this.FALLBACK_CARRIERS) {
-      const result = await this.trackWithCarrier(trackingNumber, carrier);
-      if (result.success) {
-        console.log(
-          `[jsoncargo] FALLBACK_HIT ${trackingNumber} on carrier=${carrier}`,
-        );
-        return result;
-      }
-      lastFailure = result;
-    }
-    return (
-      lastFailure ??
-      this.failure(
-        trackingNumber,
-        "Container not found across the major ocean carriers we cover.",
-      )
+    // live shipments. We fan out to every fallback carrier in
+    // parallel and return the first success — sequential trips
+    // would blow past our 12s external-check budget when the
+    // first carrier guess is wrong (Maersk-first fails for an
+    // MSC container, for example). Worst case is 6 API calls
+    // paid only on `add`/poll for containers we can't pre-
+    // identify; total wall time is one carrier's RTT.
+    const attempts = this.FALLBACK_CARRIERS.map((carrier) =>
+      this.trackWithCarrier(trackingNumber, carrier).then((r) => {
+        if (r.success) {
+          console.log(
+            `[jsoncargo] FALLBACK_HIT ${trackingNumber} on carrier=${carrier}`,
+          );
+          return r;
+        }
+        // Reject so Promise.any can pick the first SUCCESS, not
+        // the first response.
+        return Promise.reject(r);
+      }),
     );
+    try {
+      return await Promise.any(attempts);
+    } catch (err) {
+      // All carriers rejected — Promise.any wraps them in an
+      // AggregateError. Surface the most informative one if we
+      // can; otherwise fall back to a generic message.
+      const aggregate = err as { errors?: ProviderResult[] };
+      const failures = aggregate.errors ?? [];
+      const informative =
+        failures.find(
+          (f) => f.error && !/timeout|network/i.test(f.error),
+        ) ?? failures[failures.length - 1];
+      return (
+        informative ??
+        this.failure(
+          trackingNumber,
+          "Container not found across the major ocean carriers we cover.",
+        )
+      );
+    }
   }
 
   private async trackWithCarrier(
@@ -186,7 +204,9 @@ export class JsonCargoProvider implements TrackingProvider {
           "Accept":    "application/json",
         },
         next: { revalidate: 0 },
-        signal: AbortSignal.timeout(15_000),
+        // 8s per carrier so 6 parallel attempts comfortably fit
+        // inside the 12s external-existence-check budget.
+        signal: AbortSignal.timeout(8_000),
       });
     } catch (err) {
       return this.failure(trackingNumber, `Network error: ${(err as Error).message}`);
