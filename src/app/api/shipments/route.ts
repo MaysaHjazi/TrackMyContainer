@@ -113,8 +113,48 @@ export async function POST(req: NextRequest) {
   }
 
   // Determine provider from plan
-  const provider       = getProviderForPlan(plan as PlanKey);  // "jsoncargo" | "shipsgo"
+  const planProvider   = getProviderForPlan(plan as PlanKey);  // "jsoncargo" | "shipsgo"
   const isLiveTracking = PLANS[plan as PlanKey].liveTracking;
+
+  // Mutable so the Maersk fast-path can downgrade ShipsGo to a free
+  // direct-Maersk fetch when applicable. Everything below uses the
+  // resolved value; the original plan-derived provider is only used
+  // as the starting point.
+  let provider = planProvider;
+
+  // ── Maersk Fast-Path (FREE, zero ShipsGo credit) ──────────────
+  // For paid (ShipsGo) plans, before doing anything that might
+  // consume a credit, try Maersk's free Track & Trace API first.
+  // Activates only when MAERSK_CONSUMER_KEY is set in the env. If
+  // Maersk has the container we use that data verbatim and skip
+  // ShipsGo entirely — no cache check, no verification, no credit.
+  // Critical for leased-prefix containers (CAIU, TRIU, BEAU, ...)
+  // that JSONCargo can't resolve and that would otherwise force a
+  // ShipsGo create.
+  if (
+    planProvider === "shipsgo" &&
+    type === "SEA" &&
+    process.env.MAERSK_CONSUMER_KEY
+  ) {
+    try {
+      const probe = await trackShipment(trackingNumber, {
+        skipCache:     true,
+        forceProvider: "maersk",
+      });
+      if (probe.events.length > 0) {
+        console.log(`[shipments] MAERSK_FAST_PATH ${logCtx} (no ShipsGo credit)`);
+        provider = "maersk";
+      }
+    } catch (err) {
+      // Maersk doesn't have it — fall through to the standard
+      // ShipsGo flow below. Most non-Maersk SEA containers land here.
+      console.log(
+        `[shipments] MAERSK_FAST_PATH miss ${logCtx}: ${
+          err instanceof Error ? err.message : "unknown"
+        }`,
+      );
+    }
+  }
 
   // ── Layers D + E: Cache + External (STRICT MODE) ──────────────
   // For ShipsGo, we only allow a credit-consuming create if the
