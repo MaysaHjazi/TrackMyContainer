@@ -109,17 +109,74 @@ export class JsonCargoProvider implements TrackingProvider {
   private readonly apiKey  = process.env.JSONCARGO_API_KEY!;
   private readonly baseUrl = "https://api.jsoncargo.com/api/v1";
 
+  /**
+   * Major ocean carriers, ordered by global market share. Used as
+   * sequential fallbacks when the container prefix is a leasing
+   * company code (CAIU, TRIU, BEAU, TGHU, etc.) and we therefore
+   * have no carrier hint from the number itself. We stop at the
+   * first carrier that actually returns data — typical hit count
+   * is 1 (Maersk) for most leased containers since they dominate
+   * the market.
+   */
+  private readonly FALLBACK_CARRIERS = [
+    "MAERSK",
+    "MSC",
+    "CMA CGM",
+    "HAPAG-LLOYD",
+    "COSCO",
+    "ONE",
+  ];
+
   async track(
     trackingNumber: string,
     _type: ShipmentType,
   ): Promise<ProviderResult> {
-
-    const url = new URL(`${this.baseUrl}/containers/${encodeURIComponent(trackingNumber)}`);
-
-    // Auto-detect shipping line from the 4-letter container prefix
     const prefix = trackingNumber.slice(0, 4).toUpperCase();
-    const shippingLine = PREFIX_TO_SHIPPING_LINE[prefix];
-    if (shippingLine) url.searchParams.set("shipping_line", shippingLine);
+    const knownLine = PREFIX_TO_SHIPPING_LINE[prefix];
+
+    // Path A — known carrier prefix (MAEU, MSCU, ...): one call,
+    // hint the right shipping_line.
+    if (knownLine) {
+      return this.trackWithCarrier(trackingNumber, knownLine);
+    }
+
+    // Path B — unknown prefix. Most of the time this means the
+    // container is owned by a leasing company (CAI, Triton,
+    // Beacon, SeaCo) and could be on any carrier. JSONCargo's
+    // `shipping_line` query param is required for accurate
+    // lookups, so without a hint we'd get NOT_FOUND even on real,
+    // live shipments. Walk the major carriers in order; first
+    // success wins. Worst case is 6 calls — bounded, predictable,
+    // and only paid on `add`/poll for containers we couldn't
+    // pre-identify.
+    let lastFailure: ProviderResult | null = null;
+    for (const carrier of this.FALLBACK_CARRIERS) {
+      const result = await this.trackWithCarrier(trackingNumber, carrier);
+      if (result.success) {
+        console.log(
+          `[jsoncargo] FALLBACK_HIT ${trackingNumber} on carrier=${carrier}`,
+        );
+        return result;
+      }
+      lastFailure = result;
+    }
+    return (
+      lastFailure ??
+      this.failure(
+        trackingNumber,
+        "Container not found across the major ocean carriers we cover.",
+      )
+    );
+  }
+
+  private async trackWithCarrier(
+    trackingNumber: string,
+    shippingLine: string,
+  ): Promise<ProviderResult> {
+    const url = new URL(
+      `${this.baseUrl}/containers/${encodeURIComponent(trackingNumber)}`,
+    );
+    url.searchParams.set("shipping_line", shippingLine);
 
     let res: Response;
     try {

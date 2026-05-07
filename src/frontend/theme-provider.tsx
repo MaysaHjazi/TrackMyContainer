@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 /**
  * Theme provider with cookie-backed persistence.
@@ -96,6 +96,33 @@ export function ThemeProvider({
   const toggleTheme = useCallback(() => {
     setTheme(theme === "dark" ? "light" : "dark");
   }, [theme, setTheme]);
+
+  // ── First-mount sync ─────────────────────────────────────────
+  // The pre-hydration inline script may have set `html.dark` based
+  // on OS preference when the visitor had no cookie yet. The server
+  // initialised this provider's state from the cookie (defaulting to
+  // "light" when missing), so React state and the actual DOM class
+  // can disagree on first paint:
+  //   - DOM has `html.dark`  → every `dark:` Tailwind variant fires
+  //   - Context says "light" → components reading useTheme() (e.g.
+  //                            the Hero) render their light variant
+  // Result: light Hero stacked on top of dark HowItWorks/Footer.
+  // We resolve it by trusting whatever the inline script put on
+  // <html> (that's what the user actually sees) and rewriting both
+  // React state AND the cookie so the next SSR is internally
+  // consistent. One-shot, only on mount.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const htmlIsDark = document.documentElement.classList.contains("dark");
+    const stateIsDark = theme === "dark";
+    if (htmlIsDark !== stateIsDark) {
+      const next: Theme = htmlIsDark ? "dark" : "light";
+      setThemeState(next);
+      writeCookie(next);
+    }
+    // intentionally one-shot
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
