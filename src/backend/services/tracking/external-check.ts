@@ -21,6 +21,7 @@ import type { ShipmentType } from "@prisma/client";
 import { JsonCargoProvider }       from "./providers/jsoncargo";
 import { LufthansaCargoProvider }  from "./providers/lufthansa";
 import { QatarAirwaysCargoProvider } from "./providers/qatar";
+import { MaerskProvider }          from "./providers/maersk";
 import type { TrackingProvider, ProviderResult } from "./providers/types";
 
 export type ExternalCheckResult = "FOUND" | "NOT_FOUND" | "UNKNOWN";
@@ -92,6 +93,36 @@ export async function externalExistenceCheck(
     return "UNKNOWN";
   }
 
-  // SEA → JsonCargo covers most major ocean carriers
-  return tryProvider(new JsonCargoProvider(), trackingNumber, type, "jsoncargo");
+  // SEA — try our free providers in order, FIRST one to FIND wins.
+  //
+  // 1. Maersk Track & Trace (free, 100k calls/month)
+  //    Activates the moment MAERSK_CONSUMER_KEY is set in env.
+  //    Critical for leased-container prefixes (CAIU, TRIU, BEAU, ...)
+  //    that JSONCargo can't resolve without a carrier hint.
+  //
+  // 2. JSONCargo MARINER (1k calls/month)
+  //    Falls back when Maersk isn't configured or the container is
+  //    on a non-Maersk carrier.
+  //
+  // We short-circuit on the first FOUND, but a NOT_FOUND from one
+  // source is NOT enough to block — the next source may know the
+  // shipment. Only block when EVERY source we tried said NOT_FOUND
+  // or all returned UNKNOWN.
+  const verdicts: ExternalCheckResult[] = [];
+
+  if (process.env.MAERSK_CONSUMER_KEY) {
+    const v = await tryProvider(new MaerskProvider(), trackingNumber, type, "maersk");
+    if (v === "FOUND") return "FOUND";
+    verdicts.push(v);
+  }
+
+  const v = await tryProvider(new JsonCargoProvider(), trackingNumber, type, "jsoncargo");
+  if (v === "FOUND") return "FOUND";
+  verdicts.push(v);
+
+  // No source said FOUND. Prefer NOT_FOUND only if EVERY source
+  // we asked agreed on it; otherwise return UNKNOWN so the user
+  // sees the gentler "carrier not covered" message rather than
+  // a wrong "doesn't exist" claim.
+  return verdicts.every((x) => x === "NOT_FOUND") ? "NOT_FOUND" : "UNKNOWN";
 }
