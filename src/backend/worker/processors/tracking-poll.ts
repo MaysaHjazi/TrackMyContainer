@@ -160,6 +160,12 @@ export async function trackingPollProcessor(
       currentStatus:   persistedStatus,
       currentLocation: result.currentLocation,
       ...etaUpdate,
+      // Original carrier ETA — never changes after first capture, so
+      // only write when it's newly available. Avoids overwriting a
+      // known value with null on a poll where the carrier omitted it.
+      ...(result.etaInitialDate && !shipment.etaInitialDate
+        ? { etaInitialDate: result.etaInitialDate }
+        : {}),
       etdDate:         result.etdDate ?? null,
       atdDate:         result.atdDate ?? null,
       ataDate:         result.ataDate ?? null,

@@ -185,7 +185,8 @@ model Shipment {
   // Dates
   etdDate         DateTime?      // Estimated time of departure
   atdDate         DateTime?      // Actual time of departure
-  etaDate         DateTime?      // Estimated time of arrival
+  etaDate         DateTime?      // Estimated time of arrival (current)
+  etaInitialDate  DateTime?      // Original carrier ETA at booking — used to compute delay days
   ataDate         DateTime?      // Actual time of arrival
 
   // Polling

@@ -298,6 +298,7 @@ export async function POST(req: NextRequest) {
       // ETA field has been overwritten with the actual arrival date —
       // skip saving it so we don't show a redundant (ETA == ATA) value.
       etaDate:          trackingData.ataDate ? null : trackingData.etaDate,
+      etaInitialDate:   trackingData.etaInitialDate ?? null,
       etdDate:          trackingData.etdDate,
       atdDate:          trackingData.atdDate,
       ataDate:          trackingData.ataDate,
