@@ -19,7 +19,8 @@ export interface ProviderResult {
   trackingNumber: string;
   carrier?:  string;
   events:    ProviderEvent[];
-  eta?:      Date;   // estimated arrival
+  eta?:      Date;   // current estimated arrival (latest carrier value)
+  etaInitial?: Date; // original ETA at booking — compared to `eta` for carrier-side delay
   etd?:      Date;   // estimated departure
   ata?:      Date;   // actual arrival
   atd?:      Date;   // actual departure
@@ -49,7 +50,8 @@ export interface TrackingResult {
   currentLocation?: string;
   origin?:       string;
   destination?:  string;
-  etaDate?:      Date;   // estimated arrival
+  etaDate?:      Date;   // current estimated arrival
+  etaInitialDate?: Date; // original carrier ETA at booking
   etdDate?:      Date;   // estimated departure
   ataDate?:      Date;   // actual arrival
   atdDate?:      Date;   // actual departure

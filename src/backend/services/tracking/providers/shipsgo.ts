@@ -240,8 +240,8 @@ export class ShipsgoProvider implements TrackingProvider {
   private parseOcean(containerNumber: string, shipment: Record<string, unknown>): ProviderResult {
     const carrier = shipment.carrier as { scac?: string; name?: string } | null;
     const route = shipment.route as {
-      port_of_loading?: { location?: { name?: string; code?: string }; date_of_loading?: string };
-      port_of_discharge?: { location?: { name?: string; code?: string }; date_of_discharge?: string };
+      port_of_loading?: { location?: { name?: string; code?: string }; date_of_loading?: string; date_of_loading_initial?: string };
+      port_of_discharge?: { location?: { name?: string; code?: string }; date_of_discharge?: string; date_of_discharge_initial?: string };
     } | null;
     const containers = (shipment.containers as Array<Record<string, unknown>>) ?? [];
 
@@ -311,6 +311,12 @@ export class ShipsgoProvider implements TrackingProvider {
       events,
       eta:            route?.port_of_discharge?.date_of_discharge
                        ? new Date(route.port_of_discharge.date_of_discharge)
+                       : undefined,
+      // Original carrier ETA at booking time. Compared to `eta` in the
+      // worker to compute carrier-side delay days even when our DB has
+      // already cached the latest (slipped) ETA.
+      etaInitial:     route?.port_of_discharge?.date_of_discharge_initial
+                       ? new Date(route.port_of_discharge.date_of_discharge_initial)
                        : undefined,
       etd:            route?.port_of_loading?.date_of_loading
                        ? new Date(route.port_of_loading.date_of_loading)

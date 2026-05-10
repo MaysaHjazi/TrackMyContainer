@@ -55,18 +55,36 @@ export async function trackingPollProcessor(
 
   // ── Effective-delay detection ─────────────────────────────────
   // Carriers (ShipsGo + JSONCargo) usually update the ETA when a
-  // shipment slips, but they rarely flip the status to DELAYED. We
-  // bridge that gap here: if the new ETA is at least one full day
-  // later than the previously-saved ETA, treat the shipment as
-  // delayed even when the carrier didn't say so. The shift count
-  // (rounded to whole days) drives the email/UI copy.
-  const oldEtaMs        = shipment.etaDate?.getTime() ?? null;
-  const newEtaMs        = result.etaDate?.getTime() ?? null;
-  const etaShiftDays    = (oldEtaMs && newEtaMs)
-    ? Math.round((newEtaMs - oldEtaMs) / 86_400_000)
+  // shipment slips, but they rarely flip the status to DELAYED.
+  //
+  // Two complementary signals drive our delay logic:
+  //
+  //   1. POLL-OVER-POLL SHIFT: new etaDate vs. previously-saved
+  //      etaDate. Catches NEW slips going forward.
+  //
+  //   2. CARRIER-SIDE BASELINE: ShipsGo exposes the booking-time
+  //      ETA as `date_of_discharge_initial` (surfaced as
+  //      `result.etaInitial`). Comparing that to today's carrier
+  //      ETA reveals the FULL slip — including delays that
+  //      happened before we ever started tracking the shipment.
+  //
+  // We take the larger of the two so an already-saved 18-day
+  // delay surfaces on the next poll instead of silently sitting
+  // at the same number forever.
+  const dayMs = 86_400_000;
+  const oldEtaMs           = shipment.etaDate?.getTime() ?? null;
+  const newEtaMs           = result.etaDate?.getTime() ?? null;
+  const etaInitialMs       = result.etaInitialDate?.getTime() ?? null;
+  const pollShiftDays      = (oldEtaMs && newEtaMs)
+    ? Math.round((newEtaMs - oldEtaMs) / dayMs)
     : 0;
-  const carrierDelayed  = result.currentStatus === "DELAYED";
-  const etaSlipped      = etaShiftDays >= 1
+  const carrierBaselineDays = (etaInitialMs && newEtaMs)
+    ? Math.round((newEtaMs - etaInitialMs) / dayMs)
+    : 0;
+  const etaShiftDays       = Math.max(pollShiftDays, carrierBaselineDays);
+
+  const carrierDelayed   = result.currentStatus === "DELAYED";
+  const etaSlipped       = etaShiftDays >= 1
     && shipment.currentStatus !== "DELIVERED"
     && shipment.currentStatus !== "AT_PORT";
   const effectiveDelayed = carrierDelayed || etaSlipped;
@@ -205,11 +223,16 @@ export async function trackingPollProcessor(
 
   // ── DELAY ALERT ─────────────────────────────────────────────
   if (newlyDelayed) {
+    // Prefer the carrier-side baseline (booking ETA) when we have it
+    // — it's the most meaningful reference for the user, matching
+    // the date they originally planned around. Fall back to the
+    // last-saved ETA only when the carrier didn't expose a baseline.
+    const previousEta = result.etaInitialDate ?? shipment.etaDate ?? null;
     const payloadBase = {
       name:       user.name ?? "there",
       number:     trackingNumber,
       newEta:     (result.etaDate ?? new Date()).toISOString(),
-      previousEta: shipment.etaDate?.toISOString() ?? null,
+      previousEta: previousEta?.toISOString() ?? null,
       delayDays:  etaShiftDays > 0 ? etaShiftDays : null,
       location:   result.currentLocation,
       url:        trackUrl,
