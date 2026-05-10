@@ -13,6 +13,13 @@ interface SendEmailOpts {
   subject:          string;
   html:             string;
   notificationType: NotificationType;
+  /** Optional plain-text summary surfaced in the in-app bell.
+   *  When omitted we fall back to `subject`, which is short, human
+   *  readable, and already carries the key facts ("MAEU... delayed
+   *  by N days — new ETA …"). The raw HTML is still sent via Resend
+   *  but never stored in the Notification row's body — that field
+   *  is what the bell renders. */
+  summary?:         string;
 }
 
 /**
@@ -27,7 +34,14 @@ export async function sendEmail({
   subject,
   html,
   notificationType,
+  summary,
 }: SendEmailOpts): Promise<void> {
+  // The bell + notifications page render `body` directly. Store a
+  // clean text summary there — never the raw HTML. Subject is a
+  // good default ("⚠️ MAEU... delayed by 18 days — new ETA …").
+  // Trim any leading emoji/symbol so the bell line reads naturally.
+  const bellBody = (summary ?? subject).replace(/^[^\w(]+\s*/, "").trim();
+
   // Create pending notification record
   const record = await prisma.notification.create({
     data: {
@@ -36,7 +50,7 @@ export async function sendEmail({
       channel:    "EMAIL",
       type:       notificationType,
       subject,
-      body:       html,
+      body:       bellBody,
       status:     "PENDING",
     },
   });
