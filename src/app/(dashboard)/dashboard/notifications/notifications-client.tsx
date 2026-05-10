@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Bell,
@@ -65,7 +66,7 @@ const TYPE_ICONS: Record<string, typeof Bell> = {
 const TYPE_ICON_COLORS: Record<string, string> = {
   ETA_UPDATE: "text-teal-500",
   ETA_IMMINENT: "text-orange-500",
-  DELAY_ALERT: "text-orange-500",
+  DELAY_ALERT: "text-red-500",
   ARRIVAL_NOTICE: "text-emerald-500",
   STATUS_CHANGE: "text-teal-500",
   CUSTOMS_HOLD: "text-red-500",
@@ -133,6 +134,7 @@ interface Props {
 }
 
 export function NotificationsClient({ notifications: initial }: Props) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState(initial);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [isPending, startTransition] = useTransition();
@@ -163,6 +165,14 @@ export function NotificationsClient({ notifications: initial }: Props) {
       );
     } catch {
       // silently fail
+    }
+  }
+
+  function handleNotificationClick(n: SerializedNotification) {
+    // Mark unread → read in the background; don't block navigation.
+    if (n.status !== "READ") void handleMarkRead(n.id);
+    if (n.shipmentId) {
+      router.push(`/dashboard/shipments/${n.shipmentId}`);
     }
   }
 
@@ -238,9 +248,18 @@ export function NotificationsClient({ notifications: initial }: Props) {
             return (
               <div
                 key={notification.id}
-                onClick={() => isUnread && handleMarkRead(notification.id)}
+                onClick={() => handleNotificationClick(notification)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleNotificationClick(notification);
+                  }
+                }}
                 className={cn(
-                  "flex items-start gap-4 rounded-xl border p-4 transition-colors cursor-pointer",
+                  "flex items-start gap-4 rounded-xl border p-4 transition-all cursor-pointer",
+                  "hover:shadow-sm hover:-translate-y-px",
                   isUnread
                     ? "border-l-4 border-l-orange-500 border-t border-r border-b border-navy-200 bg-orange-50/50 dark:border-navy-700 dark:border-l-orange-500 dark:bg-orange-500/5"
                     : "border-navy-200 bg-white dark:border-navy-800 dark:bg-navy-900"

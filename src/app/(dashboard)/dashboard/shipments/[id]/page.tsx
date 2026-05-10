@@ -269,6 +269,69 @@ export default async function ShipmentDetailPage({
           </div>
         </div>
 
+        {/* ── Delay Banner ──────────────────────────────────────────
+            Shown when the shipment is currently DELAYED. Surfaces the
+            two pieces of data the user actually needs: how many days
+            late and what the new arrival looks like — followed by a
+            short, human apology so the page reads sympathetic, not
+            sterile. Uses red palette to match the new DELAYED badge. */}
+        {(() => {
+          if (shipment.currentStatus !== "DELAYED") return null;
+
+          const oldEta = shipment.etaInitialDate;
+          const newEta = shipment.etaDate;
+          const delayDays = (oldEta && newEta)
+            ? Math.max(0, Math.round((newEta.getTime() - oldEta.getTime()) / 86_400_000))
+            : null;
+
+          return (
+            <div className="rounded-2xl border border-red-200 bg-red-50/70 p-5 shadow-sm
+                            dark:border-red-500/30 dark:bg-red-500/10">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center
+                                rounded-xl bg-red-100 dark:bg-red-500/20">
+                  <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-extrabold text-red-700 dark:text-red-300">
+                    {delayDays
+                      ? `Shipment delayed by ${delayDays} day${delayDays === 1 ? "" : "s"}`
+                      : "Shipment delayed"}
+                  </h3>
+                  <p className="mt-1 text-sm text-red-700/85 dark:text-red-300/85 leading-relaxed">
+                    The carrier pushed the arrival estimate back. We&apos;re sorry for the inconvenience —
+                    we&apos;ll keep monitoring and notify you the moment the schedule firms up again.
+                  </p>
+                  {(oldEta || newEta) && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {oldEta && (
+                        <div className="rounded-lg border border-red-200/70 bg-white/60 px-3 py-2
+                                        dark:border-red-500/20 dark:bg-red-500/5">
+                          <p className="text-[10px] font-bold uppercase tracking-wider
+                                        text-red-500 dark:text-red-400">Original ETA</p>
+                          <p className="mt-0.5 text-sm font-semibold text-navy-900 dark:text-white line-through opacity-70">
+                            {formatDate(oldEta)}
+                          </p>
+                        </div>
+                      )}
+                      {newEta && (
+                        <div className="rounded-lg border border-red-200/70 bg-white/60 px-3 py-2
+                                        dark:border-red-500/20 dark:bg-red-500/5">
+                          <p className="text-[10px] font-bold uppercase tracking-wider
+                                        text-red-500 dark:text-red-400">New ETA</p>
+                          <p className="mt-0.5 text-sm font-extrabold text-navy-900 dark:text-white">
+                            {formatDate(newEta)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Route Visualization ──────────────────────────────────
             FREE: clear "where is my container?" summary card.
             PRO/CUSTOM: full animated route visualization.        */}
