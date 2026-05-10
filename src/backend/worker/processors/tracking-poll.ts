@@ -51,8 +51,37 @@ export async function trackingPollProcessor(
   const statusChanged  = result.currentStatus !== shipment.currentStatus;
   const etaChanged     = result.etaDate?.toISOString() !== shipment.etaDate?.toISOString();
   const newlyDelivered = result.currentStatus === "DELIVERED" && shipment.currentStatus !== "DELIVERED";
-  const newlyDelayed   = result.currentStatus === "DELAYED"   && shipment.currentStatus !== "DELAYED";
   const isArrivingSoon = result.etaDate && daysUntil(result.etaDate) <= 3 && daysUntil(result.etaDate) >= 0;
+
+  // ── Effective-delay detection ─────────────────────────────────
+  // Carriers (ShipsGo + JSONCargo) usually update the ETA when a
+  // shipment slips, but they rarely flip the status to DELAYED. We
+  // bridge that gap here: if the new ETA is at least one full day
+  // later than the previously-saved ETA, treat the shipment as
+  // delayed even when the carrier didn't say so. The shift count
+  // (rounded to whole days) drives the email/UI copy.
+  const oldEtaMs        = shipment.etaDate?.getTime() ?? null;
+  const newEtaMs        = result.etaDate?.getTime() ?? null;
+  const etaShiftDays    = (oldEtaMs && newEtaMs)
+    ? Math.round((newEtaMs - oldEtaMs) / 86_400_000)
+    : 0;
+  const carrierDelayed  = result.currentStatus === "DELAYED";
+  const etaSlipped      = etaShiftDays >= 1
+    && shipment.currentStatus !== "DELIVERED"
+    && shipment.currentStatus !== "AT_PORT";
+  const effectiveDelayed = carrierDelayed || etaSlipped;
+  const newlyDelayed     = effectiveDelayed && shipment.currentStatus !== "DELAYED";
+
+  // If we inferred the delay from an ETA shift (rather than the
+  // carrier saying DELAYED outright), promote the saved status to
+  // DELAYED so the UI badge turns red and the dashboard filter
+  // correctly classifies it. We only do this for shipments still
+  // in flight — never for arrivals.
+  const persistedStatus = (etaSlipped && !carrierDelayed
+    && result.currentStatus !== "DELIVERED"
+    && result.currentStatus !== "AT_PORT")
+      ? "DELAYED"
+      : result.currentStatus;
 
   // ── Persist new tracking events ──────────────────────────────
   // Only persist events that have actually happened — providers like
@@ -110,7 +139,7 @@ export async function trackingPollProcessor(
   await prisma.shipment.update({
     where: { id: shipmentId },
     data: {
-      currentStatus:   result.currentStatus,
+      currentStatus:   persistedStatus,
       currentLocation: result.currentLocation,
       ...etaUpdate,
       etdDate:         result.etdDate ?? null,
@@ -124,7 +153,7 @@ export async function trackingPollProcessor(
       // AT_PORT at destination is terminal for most routes — JSONCargo often
       // never reports DELIVERED (last-mile handoff isn't visible to the API).
       // TRANSSHIPMENT is a different status and remains active.
-      isActive:        result.currentStatus !== "DELIVERED" && result.currentStatus !== "AT_PORT",
+      isActive:        persistedStatus !== "DELIVERED" && persistedStatus !== "AT_PORT",
     },
   });
 
@@ -177,11 +206,13 @@ export async function trackingPollProcessor(
   // ── DELAY ALERT ─────────────────────────────────────────────
   if (newlyDelayed) {
     const payloadBase = {
-      name:     user.name ?? "there",
-      number:   trackingNumber,
-      newEta:   (result.etaDate ?? new Date()).toISOString(),
-      location: result.currentLocation,
-      url:      trackUrl,
+      name:       user.name ?? "there",
+      number:     trackingNumber,
+      newEta:     (result.etaDate ?? new Date()).toISOString(),
+      previousEta: shipment.etaDate?.toISOString() ?? null,
+      delayDays:  etaShiftDays > 0 ? etaShiftDays : null,
+      location:   result.currentLocation,
+      url:        trackUrl,
     };
 
     if (whatsappEnabled) {

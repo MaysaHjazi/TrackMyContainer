@@ -117,25 +117,46 @@ function fmtDate(d: Date): string {
 
 interface DelayArgs extends BaseArgs {
   newEta:           Date;
+  previousEta?:     Date | null;
+  delayDays?:       number | null;
   currentLocation?: string;
 }
 
 export function delayAlertEmail(args: DelayArgs): { subject: string; html: string } {
-  const subject = `⚠️ ${args.trackingNumber} delayed — new ETA ${args.newEta.toLocaleDateString()}`;
+  // "by X days" only when we know how big the slip is
+  const days = (args.delayDays && args.delayDays > 0) ? args.delayDays : null;
+  const slip = days ? ` (delayed by ${days} day${days === 1 ? "" : "s"})` : "";
+  const subject = `⚠️ ${args.trackingNumber}${slip} — new ETA ${args.newEta.toLocaleDateString()}`;
+
   const rows: Array<{ label: string; value: string }> = [
-    { label: "Container",              value: escHtml(args.trackingNumber) },
+    { label: "Container", value: escHtml(args.trackingNumber) },
   ];
-  if (args.currentLocation) rows.push({ label: "Current location", value: escHtml(args.currentLocation) });
-  rows.push({ label: "Updated arrival estimate", value: escHtml(fmtDate(args.newEta)) });
+  if (days) {
+    rows.push({ label: "Delay", value: `${days} day${days === 1 ? "" : "s"}` });
+  }
+  if (args.previousEta) {
+    rows.push({ label: "Previous ETA", value: escHtml(fmtDate(args.previousEta)) });
+  }
+  rows.push({ label: "New ETA", value: escHtml(fmtDate(args.newEta)) });
+  if (args.currentLocation) {
+    rows.push({ label: "Current location", value: escHtml(args.currentLocation) });
+  }
+
+  // Uses brand red palette so the alert reads as an exception, not a status update.
+  const RED = "#DC2626";
+  const RED_TINT = "#FEF2F2";
+  const headline = days
+    ? `Delayed by ${days} day${days === 1 ? "" : "s"}`
+    : `Delay detected`;
 
   const body = `
     <tr><td style="padding:32px 32px 16px;">
-      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">Delay detected</h1>
+      <h1 style="margin:0;font-size:24px;color:${BRAND.ink};font-weight:800;letter-spacing:-0.3px;">${escHtml(headline)}</h1>
       <p style="margin:10px 0 0;font-size:15px;color:${BRAND.body};line-height:1.6;">Hi ${escHtml(args.name)}, your shipment has been delayed. The carrier issued a new arrival estimate.</p>
     </td></tr>
-    ${statusCard({ accent: BRAND.orange, tint: "#FFF6ED", rows })}
+    ${statusCard({ accent: RED, tint: RED_TINT, rows })}
     <tr><td style="padding:0 32px 32px;">${ctaButton(args.url, "View shipment")}</td></tr>`;
-  return { subject, html: shell({ title: subject, preheader: `Delay detected on ${args.trackingNumber}`, body }) };
+  return { subject, html: shell({ title: subject, preheader: `Delay detected on ${args.trackingNumber}${slip}`, body }) };
 }
 
 // ─────────────────────────────────────────────────────────────
