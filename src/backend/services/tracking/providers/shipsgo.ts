@@ -154,6 +154,33 @@ export class ShipsgoProvider implements TrackingProvider {
     }
   }
 
+  /** SCACs we walk through when the container's 4-letter prefix
+   *  isn't itself a shipping line — i.e. leasing-company codes like
+   *  CAIU (CAI International), TRIU (Triton), BEAU (Beacon), TGHU
+   *  (Textainer). Ordered by global market share so MAEU usually
+   *  wins on the first try. Failed creates do NOT consume a credit
+   *  (ShipsGo only bills on a successful insert), so a wrong SCAC
+   *  is cheap. */
+  private readonly FALLBACK_SCACS = ["MAEU", "MSCU", "CMAU", "HLCU", "COSU", "ONEY"];
+
+  /** Owner prefixes that are themselves valid SCACs (a 1:1 mapping
+   *  carrier-owned containers). Anything outside this set is treated
+   *  as a leasing/unknown prefix and routed through the SCAC
+   *  fallback above. */
+  private readonly KNOWN_SHIPPING_LINE_PREFIXES = new Set([
+    "MAEU", "MRKU", "MSKU", "MSAU",      // Maersk
+    "MSCU", "MEDU",                        // MSC
+    "CMAU", "CGMU", "APLU",                // CMA CGM
+    "HLCU", "HLXU", "UACU",                // Hapag-Lloyd
+    "COSU", "CCLU",                        // COSCO
+    "EISU", "EMCU",                        // Evergreen
+    "YMLU", "YMMU",                        // Yang Ming
+    "HDMU", "HMMU",                        // HMM
+    "ZIMU", "ZCLU",                        // ZIM
+    "PILU", "PCIU",                        // PIL
+    "ONEY", "NYKU", "ONEU",                // ONE
+  ]);
+
   private async createOrGetOceanShipment(containerNumber: string, scac: string): Promise<{ id: number; wasCreated: boolean } | null> {
     // ── Step 1: Search existing (FREE — no credits consumed) ──
     const listRes = await fetch(
@@ -172,33 +199,58 @@ export class ShipsgoProvider implements TrackingProvider {
       }
     }
 
-    // ── Step 2: Create new shipment (costs 1 credit) ───────────
+    // ── Step 2: Create new shipment (costs 1 credit on success) ──
+    // Build the ordered SCAC list:
+    //   1. The container's own prefix WHEN it's a known shipping
+    //      line — Maersk-owned MAEU containers should always be
+    //      attempted with carrier=MAEU first.
+    //   2. Otherwise (leasing prefix like CAIU), fall straight to
+    //      the major-carrier fallback list below.
+    // De-dupe so a known-line container doesn't re-attempt itself.
+    const scacsToTry: string[] = this.KNOWN_SHIPPING_LINE_PREFIXES.has(scac)
+      ? [scac, ...this.FALLBACK_SCACS.filter((s) => s !== scac)]
+      : this.FALLBACK_SCACS;
+
+    for (const candidate of scacsToTry) {
+      const attempt = await this.attemptCreate(containerNumber, candidate);
+      if (attempt) return attempt;
+    }
+    return null;
+  }
+
+  /** Single create attempt against a specific SCAC. Returns the new
+   *  shipment id on success, null on benign failure (so the caller
+   *  can try the next SCAC), or throws on credit exhaustion. */
+  private async attemptCreate(containerNumber: string, carrier: string): Promise<{ id: number; wasCreated: boolean } | null> {
     const createRes = await fetch(`${this.baseUrl}/ocean/shipments`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({ container_number: containerNumber, carrier: scac }),
+      body: JSON.stringify({ container_number: containerNumber, carrier }),
       signal: AbortSignal.timeout(10_000),
       next: { revalidate: 0 },
     });
 
     if (createRes.ok) {
       const data = await createRes.json() as { shipment?: { id: number } };
-      if (data.shipment?.id) return { id: data.shipment.id, wasCreated: true };
-    }
-
-    // Check if failure is due to insufficient credits
-    if (!createRes.ok) {
-      const body = await createRes.text().catch(() => "");
-      const parsed = this.tryParseJson(body);
-      if (parsed?.message === "NOT_ENOUGH_CREDITS") {
-        throw new Error(
-          "Shipsgo credits exhausted. " +
-          "Register a new free account at app.shipsgo.com to get fresh credits, " +
-          "or use a different provider."
-        );
+      if (data.shipment?.id) {
+        console.log(`[shipsgo] CREATE OK ${containerNumber} carrier=${carrier} id=${data.shipment.id}`);
+        return { id: data.shipment.id, wasCreated: true };
       }
     }
 
+    // Credit exhaustion is fatal — propagate immediately.
+    const body = await createRes.text().catch(() => "");
+    const parsed = this.tryParseJson(body);
+    if (parsed?.message === "NOT_ENOUGH_CREDITS") {
+      throw new Error(
+        "Shipsgo credits exhausted. " +
+        "Register a new free account at app.shipsgo.com to get fresh credits, " +
+        "or use a different provider."
+      );
+    }
+
+    // Any other failure: log and let the caller try the next SCAC.
+    console.log(`[shipsgo] create with carrier=${carrier} rejected (${createRes.status})`);
     return null;
   }
 

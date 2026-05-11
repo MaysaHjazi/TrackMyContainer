@@ -157,35 +157,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── JSONCargo Fast-Path (FREE, zero ShipsGo credit) ───────────
-  // Maersk's API requires a Customer Code most users don't have,
-  // so the fast-path above usually misses. JSONCargo (MARINER plan,
-  // 1k calls/month) is genuinely free and now also runs the
-  // multi-carrier fallback for unknown / leasing prefixes — when it
-  // returns events we have everything we need to skip ShipsGo and
-  // save a credit. This is the path that actually solves CAIU /
-  // TRIU / BEAU containers in practice.
-  if (
-    provider === "shipsgo" &&         // Maersk fast-path didn't already win
-    type === "SEA" &&
-    process.env.JSONCARGO_API_KEY
-  ) {
-    try {
-      const probe = await trackShipment(trackingNumber, {
-        skipCache:     true,
-        forceProvider: "jsoncargo",
-      });
-      if (probe.events.length > 0) {
-        console.log(`[shipments] JSONCARGO_FAST_PATH ${logCtx} (no ShipsGo credit)`);
-        provider = "jsoncargo";
-      }
-    } catch (err) {
-      console.log(
-        `[shipments] JSONCARGO_FAST_PATH miss ${logCtx}: ${
-          err instanceof Error ? err.message : "unknown"
-        }`,
-      );
-    }
-  }
+  // Provider-routing rule (per product decision):
+  //   • PRO  → always ShipsGo (full event timeline, paid credits)
+  //   • FREE → always JSONCargo (summary-level, no credits)
+  // We deliberately do NOT downgrade PRO to JSONCargo even when
+  // JSONCargo could resolve the container for free — paying users
+  // pay precisely so every event ("Gate in", "Loaded", "Discharged",
+  // ...) reaches the dashboard, not just the 3 milestones JSONCargo
+  // exposes. Layer D below still saves a credit when ShipsGo's
+  // global cache already has the container.
 
   // ── Layers D + E: Cache + External (STRICT MODE) ──────────────
   // For ShipsGo, we only allow a credit-consuming create if the
