@@ -3,6 +3,7 @@ import { WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
 import { prisma } from "@/backend/lib/db";
 import { isMetaProvider, sendMetaText } from "./whatsapp-meta";
 import { isEvolutionEnabled, sendEvolutionText } from "./evolution";
+import { isUltraMsgEnabled, sendUltraMsgText } from "./ultramsg";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -45,6 +46,30 @@ export async function sendWhatsApp({
       status:   "PENDING",
     },
   });
+
+  // ── UltraMsg path (TEMPORARY hosted WhatsApp Web gateway) ────
+  // Highest priority when ULTRAMSG_ENABLED=true. Same human-readable
+  // body as web / email. No Meta template / 24h-window limit.
+  if (isUltraMsgEnabled()) {
+    try {
+      const id = await sendUltraMsgText(toPhone, body);
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  { status: "SENT", externalId: id, sentAt: new Date() },
+      });
+    } catch (err) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  {
+          status:   "FAILED",
+          failedAt: new Date(),
+          error:    err instanceof Error ? err.message : "UltraMsg send failed",
+        },
+      });
+      throw err;
+    }
+    return;
+  }
 
   // ── Evolution API path (TEMPORARY WhatsApp Web bridge) ───────
   // Highest priority when EVOLUTION_ENABLED=true: delivers proactive
