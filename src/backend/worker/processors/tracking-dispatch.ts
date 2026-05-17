@@ -1,6 +1,7 @@
 import type { Job } from "bullmq";
 import { prisma } from "@/backend/lib/db";
 import { trackingPollQueue, DISPATCHER_REPEAT_EVERY_MS } from "@/backend/lib/queue";
+import { runWhatsappUpdates } from "./whatsapp-updates";
 
 /**
  * Scheduler fan-out: enumerate every active shipment and enqueue a
@@ -62,4 +63,9 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
   }
 
   console.log(`[tracking-dispatch] Enqueued ${added}/${shipments.length} poll job(s) (bucket=${bucket})`);
+
+  // Additive WhatsApp pass — no-ops unless WHATSAPP_PROVIDER=meta.
+  await runWhatsappUpdates().catch((e) =>
+    console.error("[tracking-dispatch] whatsapp pass:", e),
+  );
 }
