@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
       "@/backend/services/whatsapp-bot/whatsapp-pro-bot"
     );
     const replies = await handleProTurn(inbound.from, inbound.text);
-    console.log(`[webhooks/ultramsg] replying ${replies.length} msg(s)`);
+    console.log(
+      `[webhooks/ultramsg] replying ${replies.length} msg(s) :: ` +
+        replies.map((r) => JSON.stringify(r.slice(0, 240))).join(" || "),
+    );
     for (const body of replies) {
       await sendUltraMsgText(inbound.from, body);
     }

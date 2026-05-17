@@ -163,25 +163,38 @@ export async function handleProTurn(
   const ships = user.shipments as ShipmentRow[];
   const t = text.trim();
   const wantsList =
-    /^(hi|hello|hey|start|menu|list|shipments|my shipments)\b/i.test(t);
+    /\b(hi|hello|hey|start|menu|list|shipments|my shipments)\b/i.test(t);
 
-  // Pick by the list position the user just saw (same deterministic
-  // order as the list). "2" → second shipment's details.
-  if (/^\d{1,2}$/.test(t)) {
-    const idx = parseInt(t, 10) - 1;
-    if (idx >= 0 && idx < ships.length) return [detailCard(ships[idx])];
-  }
-
-  // A specific shipment number?
-  if (TRACKING_LIKE.test(t) && !/^my\b/i.test(t)) {
+  // 1) A shipment number mentioned ANYWHERE in the message
+  //    ("what about MAEU9184879", "MAEU9184879?", "track CAIU2444270").
+  const tokens = t.split(/[^A-Za-z0-9-]+/).filter(Boolean);
+  const numToken = tokens.find(
+    (tok) => /\d/.test(tok) && /^[A-Za-z0-9-]{6,}$/.test(tok),
+  );
+  if (numToken) {
     const hit = ships.find(
-      (s) => s.trackingNumber.toUpperCase() === t.toUpperCase(),
+      (s) => s.trackingNumber.toUpperCase() === numToken.toUpperCase(),
     );
     if (hit) return [detailCard(hit)];
     return [
       `That shipment isn't in your account.\n\n` +
-        `Send "my shipments" to see what you're tracking. 🚢`,
+        `Type *list* to see what you're tracking. 🚢`,
     ];
+  }
+
+  // 2) A list position mentioned ANYWHERE ("2", "and 1 ?",
+  //    "what about 3", "number 2 please") — not when asking for the list.
+  if (!wantsList) {
+    const m = t.match(/\b(\d{1,2})\b/);
+    if (m) {
+      const idx = parseInt(m[1], 10) - 1;
+      if (idx >= 0 && idx < ships.length) return [detailCard(ships[idx])];
+      if (ships.length)
+        return [
+          `You only have ${ships.length} shipment${ships.length === 1 ? "" : "s"}. ` +
+            `Type *list* to see them. 🚢`,
+        ];
+    }
   }
 
   if (ships.length === 0) {
