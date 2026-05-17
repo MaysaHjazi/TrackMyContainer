@@ -44,37 +44,89 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <svg
           aria-hidden
           viewBox="0 0 480 360"
-          className="pointer-events-none absolute -right-10 top-1/2 h-[120%] w-[88%] -translate-y-1/2 opacity-90"
+          className="pointer-events-none absolute -right-10 top-1/2 h-[120%] w-[88%] -translate-y-1/2 opacity-95"
           fill="none"
         >
           <defs>
+            {/* Brand-only: orange family — no off-brand hues */}
             <linearGradient id="auth-route" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#00B4C4" />
-              <stop offset="55%" stopColor="#7FA8D6" />
-              <stop offset="100%" stopColor="#F5821F" />
+              <stop offset="0%" stopColor="#F5821F" />
+              <stop offset="100%" stopColor="#FFB877" />
             </linearGradient>
+            <path
+              id="auth-path"
+              d="M70 250 C 150 90, 330 90, 420 160"
+            />
           </defs>
-          <path
-            d="M70 250 C 150 90, 330 90, 420 200"
+
+          {/* faint full route underlay */}
+          <use
+            href="#auth-path"
+            stroke="#F5821F"
+            strokeOpacity="0.18"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* animated dashed route that draws itself, then keeps flowing */}
+          <use
+            href="#auth-path"
             stroke="url(#auth-route)"
             strokeWidth="2.5"
             strokeLinecap="round"
-            strokeDasharray="6 9"
+            strokeDasharray="7 10"
             style={{
               strokeDashoffset: 600,
-              animation: "auth-dash 2.4s ease-out 0.3s forwards",
+              animation:
+                "auth-dash 2.2s ease-out 0.3s forwards, auth-flow 3s linear 2.5s infinite",
             }}
           />
-          <circle cx="70" cy="250" r="6" fill="#00B4C4" />
-          <circle cx="70" cy="250" r="6" fill="none" stroke="#00B4C4" strokeWidth="2">
-            <animate attributeName="r" from="6" to="20" dur="2.4s" repeatCount="indefinite" />
-            <animate attributeName="opacity" from="0.6" to="0" dur="2.4s" repeatCount="indefinite" />
+
+          {/* origin port node (orange, pulsing) */}
+          <circle cx="70" cy="250" r="5.5" fill="#F5821F" />
+          <circle cx="70" cy="250" r="5.5" fill="none" stroke="#F5821F" strokeWidth="2">
+            <animate attributeName="r" from="5.5" to="22" dur="2.6s" repeatCount="indefinite" />
+            <animate attributeName="opacity" from="0.55" to="0" dur="2.6s" repeatCount="indefinite" />
           </circle>
-          <circle cx="420" cy="200" r="6" fill="#F5821F" />
-          <circle cx="420" cy="200" r="6" fill="none" stroke="#F5821F" strokeWidth="2">
-            <animate attributeName="r" from="6" to="20" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" from="0.6" to="0" dur="2.4s" begin="1.2s" repeatCount="indefinite" />
+
+          {/* destination port node */}
+          <circle cx="420" cy="160" r="5.5" fill="#FFB877" />
+          <circle cx="420" cy="160" r="5.5" fill="none" stroke="#FFB877" strokeWidth="2">
+            <animate attributeName="r" from="5.5" to="22" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
+            <animate attributeName="opacity" from="0.55" to="0" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
           </circle>
+
+          {/* ── Shipping container travelling along the route ── */}
+          <g style={{ opacity: 0, animation: "auth-fadein 0.6s ease-out 1.4s forwards" }}>
+            <g transform="translate(-19,-13)">
+              {/* soft shadow */}
+              <ellipse cx="19" cy="28" rx="17" ry="3" fill="#000" opacity="0.28" />
+              {/* container body */}
+              <rect x="2" y="8" width="34" height="18" rx="2" fill="#F5821F" />
+              <rect x="2" y="8" width="34" height="5.5" rx="2" fill="#FFB877" />
+              {/* corrugation ribs */}
+              <g stroke="#0B1430" strokeOpacity="0.30" strokeWidth="1.4">
+                <line x1="9" y1="14" x2="9" y2="26" />
+                <line x1="15" y1="14" x2="15" y2="26" />
+                <line x1="21" y1="14" x2="21" y2="26" />
+                <line x1="27" y1="14" x2="27" y2="26" />
+                <line x1="33" y1="14" x2="33" y2="26" />
+              </g>
+              {/* corner castings */}
+              <rect x="2" y="8" width="4" height="4" fill="#FFFFFF" opacity="0.85" />
+              <rect x="32" y="22" width="4" height="4" fill="#FFFFFF" opacity="0.7" />
+            </g>
+            {/* drive the container along the path, keeping it upright */}
+            <animateMotion
+              dur="7s"
+              begin="1.4s"
+              repeatCount="indefinite"
+              keyPoints="0;1"
+              keyTimes="0;1"
+              calcMode="linear"
+            >
+              <mpath href="#auth-path" />
+            </animateMotion>
+          </g>
         </svg>
 
         <Link href="/" className="relative z-10 inline-flex w-fit items-center gap-3">
@@ -141,7 +193,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </p>
       </main>
 
-      <style>{`@keyframes auth-dash{to{stroke-dashoffset:0}}`}</style>
+      <style>{`
+        @keyframes auth-dash{to{stroke-dashoffset:0}}
+        @keyframes auth-flow{to{stroke-dashoffset:-340}}
+        @keyframes auth-fadein{to{opacity:1}}
+        @media (prefers-reduced-motion: reduce){
+          [style*="auth-dash"],[style*="auth-flow"],[style*="auth-fadein"]{animation:none!important}
+        }
+      `}</style>
     </div>
   );
 }
