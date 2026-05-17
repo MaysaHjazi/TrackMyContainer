@@ -43,6 +43,15 @@ interface ShipmentDot {
    *  rest render dashed (remaining) — mirrors ShipsGo's progress
    *  visualisation. */
   progressIndex?: number;
+  /** Dense maritime polyline (SEA only): searoute-ts run between the
+   *  REAL consecutive port waypoints so the line follows ocean lanes
+   *  (around capes, through canals) instead of cutting across land.
+   *  The ports are 100% from ShipsGo events; only the curve shape
+   *  between two real ports is computed (ShipsGo gives no GPS track). */
+  routePolyline?: [number, number][];
+  /** Index into `routePolyline` at the live position — splits the
+   *  polyline into travelled (solid) vs remaining (dashed). */
+  polylineProgressIndex?: number;
 }
 
 interface Props {
@@ -96,13 +105,16 @@ const SEA_PALETTE = [
   "#1E3A8A", // deep navy
   "#10B981", // emerald
 ];
+// AIR: shades of the PROJECT BRAND ORANGE (#F5821F) only — every air
+// shipment stays recognisably "brand orange", just lighter/darker per
+// shipment for separation. No off-brand reds/roses.
 const AIR_PALETTE = [
-  "#F5821F", // brand orange
-  "#DC2626", // red
-  "#F59E0B", // amber
-  "#DB2777", // rose
-  "#EA580C", // burnt orange
-  "#B45309", // brown amber
+  "#F5821F", // brand orange (canonical)
+  "#FFA04D", // brand +tint
+  "#D96A12", // brand -shade
+  "#FFB877", // brand ++tint
+  "#B85410", // brand --shade
+  "#FF922E", // brand light
 ];
 
 function shipmentColor(type: "SEA" | "AIR", index: number): string {
@@ -233,47 +245,56 @@ export function WorldMapPanel({ shipments }: Props) {
           </Geographies>
 
           {/* ── Shipment routes ─────────
-              Each leg is a great-circle between two real ports the
-              container has been reported at (from ShipsGo events).
-              Travelled legs render solid + glow, remaining legs render
-              dashed + faded — mirroring ShipsGo's progress style. */}
+              SEA: dense maritime polyline (searoute between the REAL
+              ShipsGo event ports) so the line hugs coastlines / rounds
+              capes / transits canals instead of slicing across land.
+              AIR / fallback: great-circle between port waypoints.
+              In both cases the segment up to the live position renders
+              solid + glow (travelled) and the rest dashed + faded
+              (remaining), mirroring ShipsGo's progress style. */}
           {mounted &&
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .flatMap((s) => {
                 const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
-                const waypoints: [number, number][] = (s.route && s.route.length >= 2)
-                  ? s.route
-                  : (() => {
-                      const a = toLngLat(s.origin);
-                      const b = toLngLat(s.destination);
-                      return a && b ? [a, b] : [];
-                    })();
-                if (waypoints.length < 2) return [];
+                const baseW = 1.6 / position.zoom;
 
-                const progress = s.progressIndex ?? (waypoints.length - 1);
+                // Choose the densest path we have: maritime polyline
+                // (SEA) → port waypoints → origin/destination fallback.
+                let path: [number, number][];
+                let progress: number;
+                if (s.routePolyline && s.routePolyline.length >= 2) {
+                  path = s.routePolyline;
+                  progress = s.polylineProgressIndex ?? (path.length - 1);
+                } else {
+                  path = (s.route && s.route.length >= 2)
+                    ? s.route
+                    : (() => {
+                        const a = toLngLat(s.origin);
+                        const b = toLngLat(s.destination);
+                        return a && b ? [a, b] : [];
+                      })();
+                  progress = s.progressIndex ?? (path.length - 1);
+                }
+                if (path.length < 2) return [];
 
-                return waypoints.slice(1).flatMap((to, i) => {
+                return path.slice(1).flatMap((to, i) => {
                   const segmentEndIdx = i + 1;
                   const isTravelled = segmentEndIdx <= progress;
-                  const baseW = 1.6 / position.zoom;
                   if (isTravelled) {
-                    // Two-pass solid line: a soft outer glow underneath
-                    // a crisp top stroke, so travelled legs catch the
-                    // eye without becoming a thick blob.
                     return [
                       <Line
                         key={`route-${s.id}-${i}-glow`}
-                        from={waypoints[i]}
+                        from={path[i]}
                         to={to}
                         stroke={stroke}
                         strokeWidth={baseW * 2.4}
                         strokeLinecap="round"
-                        opacity={0.18}
+                        opacity={0.16}
                       />,
                       <Line
                         key={`route-${s.id}-${i}`}
-                        from={waypoints[i]}
+                        from={path[i]}
                         to={to}
                         stroke={stroke}
                         strokeWidth={baseW}
@@ -285,7 +306,7 @@ export function WorldMapPanel({ shipments }: Props) {
                   return (
                     <Line
                       key={`route-${s.id}-${i}`}
-                      from={waypoints[i]}
+                      from={path[i]}
                       to={to}
                       stroke={stroke}
                       strokeWidth={baseW * 0.85}
