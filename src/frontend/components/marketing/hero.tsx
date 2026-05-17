@@ -642,23 +642,34 @@ export function Hero() {
     const w = canvas.offsetWidth;
     const h = canvas.offsetHeight;
 
-    const stars = 250;
+    // Deterministic but *naturally* scattered field. The old
+    // `(seed*13) % (w*100)` modulo math produced visible diagonal
+    // banding / clumping. A fractional-sine hash gives an even,
+    // organic spread (no two stars line up), and a higher count
+    // makes the sky read as a fine dusting rather than dots.
+    const rand = (n: number) => {
+      const v = Math.sin(n * 12.9898) * 43758.5453;
+      return v - Math.floor(v);
+    };
+
+    const stars = 340;
     for (let i = 0; i < stars; i++) {
-      const seed = i * 7919;
-      const x = ((seed * 13) % (w * 100)) / 100;
-      const y = ((seed * 17) % (h * 100)) / 100;
-      const size = 0.3 + ((seed % 10) / 10) * 1.2;
-      const alpha = 0.15 + ((seed % 7) / 7) * 0.45;
+      const x = rand(i + 1) * w;
+      const y = rand(i * 2.17 + 9.13) * h;
+      const r = rand(i * 3.71 + 4.2);
+      const size = 0.25 + r * 0.95;
+      const alpha = 0.12 + rand(i * 5.3 + 1.7) * 0.5;
 
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
       ctx.fill();
 
-      if (i % 8 === 0) {
+      // Occasional soft glow halo on the brighter stars only.
+      if (r > 0.86) {
         ctx.beginPath();
-        ctx.arc(x, y, size * 3, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(200, 220, 255, ${alpha * 0.15})`;
+        ctx.arc(x, y, size * 3.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200, 220, 255, ${alpha * 0.16})`;
         ctx.fill();
       }
     }

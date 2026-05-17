@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { siteConfig } from "@/config/site";
 import { ThemeProvider, themeInitScript, THEME_COOKIE } from "@/frontend/theme-provider";
-import { WhatsAppFab } from "@/frontend/components/layout/whatsapp-fab";
 
 export const metadata: Metadata = {
   title: {
@@ -109,7 +108,6 @@ export default async function RootLayout({
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider initialTheme={initialTheme}>
           {children}
-          <WhatsAppFab />
         </ThemeProvider>
       </body>
     </html>

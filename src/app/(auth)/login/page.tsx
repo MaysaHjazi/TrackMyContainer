@@ -54,27 +54,41 @@ function LoginForm() {
   };
 
   return (
-    <div className="rounded-2xl border border-navy-100 bg-white p-8 shadow-lg dark:border-navy-800 dark:bg-navy-900">
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-extrabold text-navy-600 dark:text-white">Welcome back</h1>
-        <p className="mt-1 text-sm text-navy-400 dark:text-navy-300">Sign in to your dashboard</p>
+    <div className="animate-[authIn_0.5s_ease-out]">
+      {/* Heading */}
+      <div className="mb-8">
+        <h1 className="text-[28px] font-extrabold tracking-tight text-navy-900 dark:text-white">
+          Welcome back
+        </h1>
+        <p className="mt-1.5 text-[14px] text-navy-500 dark:text-white/45">
+          Sign in to pick up where your cargo left off.
+        </p>
       </div>
 
-      {/* Error message */}
+      {/* Error */}
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+        <div
+          role="alert"
+          className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50/80
+                     px-4 py-3 text-[13px] font-medium text-red-700
+                     dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300"
+        >
+          <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
           {error}
         </div>
       )}
 
-      {/* Google sign-in */}
+      {/* Google */}
       <button
         onClick={handleGoogleLogin}
         disabled={googleLoading}
-        className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-navy-200 bg-white px-4 py-3
-                   text-sm font-semibold text-navy-600 hover:bg-navy-50 transition-colors
-                   disabled:opacity-60 disabled:cursor-not-allowed
-                   dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:hover:bg-navy-700"
+        className="group flex w-full items-center justify-center gap-3 rounded-xl
+                   border border-navy-200 bg-white px-4 py-3 text-[14px] font-semibold
+                   text-navy-700 shadow-[0_1px_2px_rgba(15,25,51,0.04)]
+                   transition-all hover:border-navy-300 hover:shadow-[0_4px_14px_-6px_rgba(15,25,51,0.18)]
+                   active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed
+                   dark:border-white/12 dark:bg-white/[0.04] dark:text-white
+                   dark:hover:border-white/25 dark:hover:bg-white/[0.07]"
       >
         {googleLoading ? (
           <Loader2 size={18} className="animate-spin" />
@@ -90,20 +104,31 @@ function LoginForm() {
       </button>
 
       {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-navy-100 dark:bg-navy-800" />
-        <span className="text-xs font-medium text-navy-400 dark:text-navy-500">or sign in with email</span>
-        <div className="h-px flex-1 bg-navy-100 dark:bg-navy-800" />
+      <div className="my-7 flex items-center gap-4">
+        <div className="h-px flex-1 bg-navy-200/70 dark:bg-white/10" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-400 dark:text-white/35">
+          or with email
+        </span>
+        <div className="h-px flex-1 bg-navy-200/70 dark:bg-white/10" />
       </div>
 
-      {/* Email/Password form */}
-      <form onSubmit={handleEmailLogin} className="space-y-4">
+      {/* Form */}
+      <form onSubmit={handleEmailLogin} className="space-y-5">
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-navy-600 dark:text-navy-200">
+          <label
+            htmlFor="email"
+            className="mb-2 block text-[12px] font-semibold uppercase tracking-wider
+                       text-navy-500 dark:text-white/50"
+          >
             Email
           </label>
-          <div className="relative">
-            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-300 dark:text-navy-500" />
+          <div className="group relative">
+            <Mail
+              size={17}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2
+                         text-navy-300 transition-colors group-focus-within:text-orange-500
+                         dark:text-white/30"
+            />
             <input
               id="email"
               type="email"
@@ -111,40 +136,58 @@ function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
               required
-              className="w-full rounded-xl border border-navy-200 bg-white py-3 pl-10 pr-4
-                         text-sm text-navy-600 placeholder:text-navy-300
-                         focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100
-                         dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-navy-500
-                         dark:focus:border-orange-400 dark:focus:ring-orange-500/20"
+              className="w-full rounded-xl border border-navy-200 bg-white py-3 pl-11 pr-4
+                         text-[14px] text-navy-900 placeholder:text-navy-300
+                         transition-all focus:border-orange-500 focus:outline-none
+                         focus:ring-4 focus:ring-orange-500/12
+                         dark:border-white/12 dark:bg-white/[0.03] dark:text-white
+                         dark:placeholder:text-white/25 dark:focus:border-orange-400
+                         dark:focus:ring-orange-400/15"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-navy-600 dark:text-navy-200">
-            Password
-          </label>
-          <div className="relative">
-            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-300 dark:text-navy-500" />
+          <div className="mb-2 flex items-center justify-between">
+            <label
+              htmlFor="password"
+              className="text-[12px] font-semibold uppercase tracking-wider
+                         text-navy-500 dark:text-white/50"
+            >
+              Password
+            </label>
+          </div>
+          <div className="group relative">
+            <Lock
+              size={17}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2
+                         text-navy-300 transition-colors group-focus-within:text-orange-500
+                         dark:text-white/30"
+            />
             <input
               id="password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder="••••••••••••"
               required
-              className="w-full rounded-xl border border-navy-200 bg-white py-3 pl-10 pr-12
-                         text-sm text-navy-600 placeholder:text-navy-300
-                         focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100
-                         dark:border-navy-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-navy-500
-                         dark:focus:border-orange-400 dark:focus:ring-orange-500/20"
+              className="w-full rounded-xl border border-navy-200 bg-white py-3 pl-11 pr-12
+                         text-[14px] text-navy-900 placeholder:text-navy-300
+                         transition-all focus:border-orange-500 focus:outline-none
+                         focus:ring-4 focus:ring-orange-500/12
+                         dark:border-white/12 dark:bg-white/[0.03] dark:text-white
+                         dark:placeholder:text-white/25 dark:focus:border-orange-400
+                         dark:focus:ring-orange-400/15"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-navy-500 dark:text-navy-500 dark:hover:text-navy-300"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1
+                         text-navy-300 transition-colors hover:text-navy-600
+                         dark:text-white/30 dark:hover:text-white/70"
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
         </div>
@@ -152,34 +195,54 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3
-                     text-sm font-bold text-white hover:bg-orange-600 active:bg-orange-700
-                     transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group relative flex w-full items-center justify-center gap-2
+                     overflow-hidden rounded-xl bg-[#F5821F] py-3.5 text-[14px] font-bold
+                     text-white shadow-[0_10px_28px_-10px_rgba(245,130,31,0.6)]
+                     transition-all hover:bg-[#E0710F] active:scale-[0.99]
+                     disabled:opacity-70 disabled:cursor-not-allowed"
         >
+          {/* sheen sweep on hover */}
+          <span
+            aria-hidden
+            className="absolute inset-0 -translate-x-full bg-gradient-to-r
+                       from-transparent via-white/25 to-transparent
+                       transition-transform duration-700 group-hover:translate-x-full"
+          />
           {loading && <Loader2 size={16} className="animate-spin" />}
-          Sign In
+          {loading ? "Signing in…" : "Sign In"}
         </button>
       </form>
 
-      {/* Register link */}
-      <p className="mt-6 text-center text-sm text-navy-400 dark:text-navy-300">
+      {/* Register */}
+      <p className="mt-7 text-center text-[13.5px] text-navy-500 dark:text-white/45">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-semibold text-orange-500 hover:underline dark:text-orange-400">
+        <Link
+          href="/register"
+          className="font-semibold text-orange-600 underline-offset-4 hover:underline
+                     dark:text-orange-400"
+        >
           Sign up free
         </Link>
       </p>
+
+      <style>{`@keyframes authIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="rounded-2xl border border-navy-100 bg-white p-8 shadow-lg dark:border-navy-800 dark:bg-navy-900 animate-pulse">
-        <div className="h-8 bg-navy-100 dark:bg-navy-800 rounded mb-4" />
-        <div className="h-4 bg-navy-100 dark:bg-navy-800 rounded w-2/3 mx-auto" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="animate-pulse space-y-5">
+          <div className="h-8 w-40 rounded-lg bg-navy-200/60 dark:bg-white/10" />
+          <div className="h-4 w-56 rounded bg-navy-200/50 dark:bg-white/[0.07]" />
+          <div className="h-12 rounded-xl bg-navy-200/40 dark:bg-white/[0.05]" />
+          <div className="h-12 rounded-xl bg-navy-200/40 dark:bg-white/[0.05]" />
+          <div className="h-12 rounded-xl bg-navy-200/40 dark:bg-white/[0.05]" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

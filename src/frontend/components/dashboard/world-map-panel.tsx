@@ -772,42 +772,45 @@ export function WorldMapPanel({ shipments }: Props) {
             3. Per-shipment list with coloured progress bars — click to
                zoom to that shipment on the map. */}
       <div className="absolute bottom-4 left-4 z-10 flex w-[280px] flex-col gap-0
-                      rounded-xl bg-navy-950/85 backdrop-blur-xl
-                      ring-1 ring-white/[0.07] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.6)]
-                      overflow-hidden">
+                      rounded-xl backdrop-blur-xl overflow-hidden
+                      bg-white/90 ring-1 ring-black/[0.06]
+                      shadow-[0_16px_32px_-14px_rgba(15,25,51,0.25)]
+                      dark:bg-navy-950/85 dark:ring-white/[0.07]
+                      dark:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.6)]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2.5">
           <div className="flex items-center gap-2">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-navy-500 dark:text-white/50">
               Live Tracking
             </span>
           </div>
-          <span className="font-mono text-[10px] font-semibold text-white/35">
+          <span className="font-mono text-[10px] font-semibold text-navy-400 dark:text-white/35">
             {shipments.filter(s => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT").length} active
           </span>
         </div>
 
         {/* Marker key */}
         <div className="flex items-center justify-between gap-2 px-4 py-2.5
-                        border-y border-white/[0.06] bg-white/[0.015]">
+                        border-y border-navy-200/70 bg-navy-50/50
+                        dark:border-white/[0.06] dark:bg-white/[0.015]">
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-[2px] bg-white/85" />
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Origin</span>
+            <span className="h-2 w-2 rounded-[2px] bg-navy-600 dark:bg-white/85" />
+            <span className="font-mono text-[9px] uppercase tracking-wider text-navy-500 dark:text-white/45">Origin</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-white/85" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-navy-500/70 opacity-60 dark:bg-white/70" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-navy-600 dark:bg-white/85" />
             </span>
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Live</span>
+            <span className="font-mono text-[9px] uppercase tracking-wider text-navy-500 dark:text-white/45">Live</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full border-[1.5px] border-white/85" />
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">Destination</span>
+            <span className="h-2 w-2 rounded-full border-[1.5px] border-navy-600 dark:border-white/85" />
+            <span className="font-mono text-[9px] uppercase tracking-wider text-navy-500 dark:text-white/45">Destination</span>
           </div>
         </div>
 
@@ -827,7 +830,7 @@ export function WorldMapPanel({ shipments }: Props) {
                     type="button"
                     onClick={() => handleZoomToShipment(s)}
                     className="group relative flex flex-col gap-1.5 px-4 py-2 text-left
-                               transition-colors hover:bg-white/[0.04]"
+                               transition-colors hover:bg-navy-100/60 dark:hover:bg-white/[0.04]"
                   >
                     {/* Coloured leading bar */}
                     <span
@@ -840,11 +843,11 @@ export function WorldMapPanel({ shipments }: Props) {
                             style={{ color }}>
                         {s.trackingNumber}
                       </span>
-                      <span className="font-mono text-[9px] tabular-nums text-white/45">
+                      <span className="font-mono text-[9px] tabular-nums text-navy-400 dark:text-white/45">
                         {pct}%
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 pl-1 text-[10px] text-white/55">
+                    <div className="flex items-center gap-1.5 pl-1 text-[10px] text-navy-500 dark:text-white/55">
                       <span className="truncate uppercase tracking-wider">
                         {(s.origin || "—").slice(0, 12)}
                       </span>
@@ -856,7 +859,7 @@ export function WorldMapPanel({ shipments }: Props) {
                       </span>
                     </div>
                     {/* Progress track */}
-                    <div className="ml-1 h-[2px] w-full rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="ml-1 h-[2px] w-full rounded-full bg-navy-200 dark:bg-white/[0.06] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
