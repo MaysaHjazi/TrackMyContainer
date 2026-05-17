@@ -66,7 +66,7 @@ export async function sendWhatsApp({
       const id = await sendUltraMsgText(toPhone, proBody);
       await prisma.notification.update({
         where: { id: notification.id },
-        data:  { status: "SENT", externalId: id, sentAt: new Date() },
+        data:  { status: "SENT", externalId: id, sentAt: new Date(), body: proBody },
       });
     } catch (err) {
       await prisma.notification.update({
