@@ -135,6 +135,13 @@ export async function handleProTurn(
   const ships = user.shipments as ShipmentRow[];
   const t = text.trim();
 
+  // Pick by the list position the user just saw (same deterministic
+  // order as the list). "2" → second shipment's details.
+  if (/^\d{1,2}$/.test(t)) {
+    const idx = parseInt(t, 10) - 1;
+    if (idx >= 0 && idx < ships.length) return [detailCard(ships[idx])];
+  }
+
   // A specific shipment number?
   if (TRACKING_LIKE.test(t) && !/^my\b/i.test(t)) {
     const hit = ships.find(
@@ -164,6 +171,6 @@ export async function handleProTurn(
     `${BRAND}\n\n` +
       `Here are your shipments:\n\n` +
       `${body}\n\n` +
-      `Reply with any shipment number above for full details.`,
+      `Reply with a list number (e.g. 1) or the full shipment number for details.`,
   ];
 }
