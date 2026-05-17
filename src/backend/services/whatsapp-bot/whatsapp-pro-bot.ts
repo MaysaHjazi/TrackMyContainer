@@ -199,6 +199,26 @@ function buildReport(ships: ShipmentRow[]): string[] {
   return msgs;
 }
 
+function buildPickList(ships: ShipmentRow[]): string[] {
+  const head = `Your shipments — pick one for full details:`;
+  const footer = `Reply with a number (e.g. 2) for the full details.`;
+  const MAX = 3500;
+  const msgs: string[] = [];
+  let cur = head;
+  ships.forEach((s, i) => {
+    const entry = `\n\n${listEntry(s, i + 1)}`;
+    if (cur.length + entry.length > MAX) {
+      msgs.push(cur);
+      cur = entry.trimStart();
+    } else {
+      cur += entry;
+    }
+  });
+  cur += `\n\n${footer}`;
+  msgs.push(cur);
+  return msgs;
+}
+
 function chooser(fresh: boolean): string {
   return (
     `${fresh ? `${BRAND}\n\n` : ""}` +
@@ -322,11 +342,8 @@ export async function handleProTurn(
   // In the chooser: 1 = details mode, 2 = report.
   if (state === "MENU") {
     if (t === "1") {
-      await saveSession(phone, "AWAIT_SHIP");
-      return [
-        `Sure — which shipment?\n\n` +
-          `Send its number (e.g. MAEU9184879), or its position from a report (e.g. 2).`,
-      ];
+      await saveSession(phone, "LISTED");
+      return buildPickList(ships);
     }
     if (t === "2") {
       await saveSession(phone, "LISTED");
