@@ -21,6 +21,14 @@ import { runWhatsappUpdates } from "./whatsapp-updates";
  */
 export async function trackingDispatchProcessor(job: Job): Promise<void> {
   console.log(`[tracking-dispatch] Processing job ${job.id} (${job.name})`);
+
+  // Additive WhatsApp pass — runs FIRST so it isn't skipped by the
+  // "no active shipments" early-return below. Self-guarded: no-ops
+  // unless WHATSAPP_PROVIDER=meta. Never touches Shipment/email logic.
+  await runWhatsappUpdates().catch((e) =>
+    console.error("[tracking-dispatch] whatsapp pass:", e),
+  );
+
   const shipments = await prisma.shipment.findMany({
     where: {
       isActive:       true,
@@ -63,9 +71,4 @@ export async function trackingDispatchProcessor(job: Job): Promise<void> {
   }
 
   console.log(`[tracking-dispatch] Enqueued ${added}/${shipments.length} poll job(s) (bucket=${bucket})`);
-
-  // Additive WhatsApp pass — no-ops unless WHATSAPP_PROVIDER=meta.
-  await runWhatsappUpdates().catch((e) =>
-    console.error("[tracking-dispatch] whatsapp pass:", e),
-  );
 }
