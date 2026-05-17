@@ -13,14 +13,28 @@ import Link from "next/link";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      {/* ── Brand panel ───────────────────────────────────────── */}
+      {/* ── Brand panel — theme-aware, clean (no route motif) ──── */}
       <aside
         className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between
-                   bg-[#0B1430] px-14 py-12 text-white"
+                   px-14 py-12
+                   bg-[#F4F7FC] text-[#1B2B5E]
+                   dark:bg-[#0B1430] dark:text-white"
       >
+        {/* Light-mode atmosphere — soft off-white / pale-blue wash */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 dark:hidden"
+          style={{
+            background:
+              "radial-gradient(120% 90% at 15% 10%, rgba(245,130,31,0.08), transparent 55%)," +
+              "radial-gradient(110% 90% at 90% 90%, rgba(27,43,94,0.10), transparent 55%)," +
+              "linear-gradient(160deg,#F8FAFE 0%,#EDF1FA 55%,#E3EAF6 100%)",
+          }}
+        />
+        {/* Dark-mode atmosphere — unchanged cinematic navy */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 hidden dark:block"
           style={{
             background:
               "radial-gradient(120% 90% at 15% 10%, rgba(245,130,31,0.16), transparent 55%)," +
@@ -28,9 +42,22 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               "linear-gradient(160deg,#0B1430 0%,#0A1027 60%,#070B1C 100%)",
           }}
         />
+        {/* Faint grid — navy lines (light) / white lines (dark) */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.18]"
+          className="pointer-events-none absolute inset-0 opacity-[0.05] dark:hidden"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(27,43,94,0.6) 1px,transparent 1px)," +
+              "linear-gradient(90deg,rgba(27,43,94,0.6) 1px,transparent 1px)",
+            backgroundSize: "54px 54px",
+            maskImage:
+              "radial-gradient(100% 100% at 50% 40%,#000 30%,transparent 80%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 hidden opacity-[0.18] dark:block"
           style={{
             backgroundImage:
               "linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px)," +
@@ -41,114 +68,30 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           }}
         />
 
-        <svg
-          aria-hidden
-          viewBox="0 0 480 360"
-          className="pointer-events-none absolute -right-10 top-1/2 h-[120%] w-[88%] -translate-y-1/2 opacity-95"
-          fill="none"
-        >
-          <defs>
-            {/* Brand-only: orange family — no off-brand hues */}
-            <linearGradient id="auth-route" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#F5821F" />
-              <stop offset="100%" stopColor="#FFB877" />
-            </linearGradient>
-            <path
-              id="auth-path"
-              d="M70 250 C 150 90, 330 90, 420 160"
-            />
-          </defs>
-
-          {/* faint full route underlay */}
-          <use
-            href="#auth-path"
-            stroke="#F5821F"
-            strokeOpacity="0.18"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* animated dashed route that draws itself, then keeps flowing */}
-          <use
-            href="#auth-path"
-            stroke="url(#auth-route)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeDasharray="7 10"
-            style={{
-              strokeDashoffset: 600,
-              animation:
-                "auth-dash 2.2s ease-out 0.3s forwards, auth-flow 3s linear 2.5s infinite",
-            }}
-          />
-
-          {/* origin port node (orange, pulsing) */}
-          <circle cx="70" cy="250" r="5.5" fill="#F5821F" />
-          <circle cx="70" cy="250" r="5.5" fill="none" stroke="#F5821F" strokeWidth="2">
-            <animate attributeName="r" from="5.5" to="22" dur="2.6s" repeatCount="indefinite" />
-            <animate attributeName="opacity" from="0.55" to="0" dur="2.6s" repeatCount="indefinite" />
-          </circle>
-
-          {/* destination port node */}
-          <circle cx="420" cy="160" r="5.5" fill="#FFB877" />
-          <circle cx="420" cy="160" r="5.5" fill="none" stroke="#FFB877" strokeWidth="2">
-            <animate attributeName="r" from="5.5" to="22" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-            <animate attributeName="opacity" from="0.55" to="0" dur="2.6s" begin="1.3s" repeatCount="indefinite" />
-          </circle>
-
-          {/* ── Shipping container travelling along the route ── */}
-          <g style={{ opacity: 0, animation: "auth-fadein 0.6s ease-out 1.4s forwards" }}>
-            <g transform="translate(-19,-13)">
-              {/* soft shadow */}
-              <ellipse cx="19" cy="28" rx="17" ry="3" fill="#000" opacity="0.28" />
-              {/* container body */}
-              <rect x="2" y="8" width="34" height="18" rx="2" fill="#F5821F" />
-              <rect x="2" y="8" width="34" height="5.5" rx="2" fill="#FFB877" />
-              {/* corrugation ribs */}
-              <g stroke="#0B1430" strokeOpacity="0.30" strokeWidth="1.4">
-                <line x1="9" y1="14" x2="9" y2="26" />
-                <line x1="15" y1="14" x2="15" y2="26" />
-                <line x1="21" y1="14" x2="21" y2="26" />
-                <line x1="27" y1="14" x2="27" y2="26" />
-                <line x1="33" y1="14" x2="33" y2="26" />
-              </g>
-              {/* corner castings */}
-              <rect x="2" y="8" width="4" height="4" fill="#FFFFFF" opacity="0.85" />
-              <rect x="32" y="22" width="4" height="4" fill="#FFFFFF" opacity="0.7" />
-            </g>
-            {/* drive the container along the path, keeping it upright */}
-            <animateMotion
-              dur="7s"
-              begin="1.4s"
-              repeatCount="indefinite"
-              keyPoints="0;1"
-              keyTimes="0;1"
-              calcMode="linear"
-            >
-              <mpath href="#auth-path" />
-            </animateMotion>
-          </g>
-        </svg>
-
         <Link href="/" className="relative z-10 inline-flex w-fit items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-header-dark.png" alt="TrackMyContainer" className="h-11 w-auto" />
+          <img src="/logo-header-light.png" alt="TrackMyContainer" className="h-11 w-auto dark:hidden" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-11 w-auto dark:block" />
         </Link>
 
         <div className="relative z-10 max-w-md">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15
-                        bg-white/[0.04] px-3.5 py-1.5 text-[11px] font-semibold uppercase
-                        tracking-[0.18em] text-white/70 backdrop-blur">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5
+                        text-[11px] font-semibold uppercase tracking-[0.18em] backdrop-blur
+                        border border-[#1B2B5E]/15 bg-[#1B2B5E]/[0.04] text-[#1B2B5E]/70
+                        dark:border-white/15 dark:bg-white/[0.04] dark:text-white/70">
             <span className="h-1.5 w-1.5 rounded-full bg-[#F5821F]" />
             Real-time freight visibility
           </p>
           <h2 className="text-[2.6rem] font-extrabold leading-[1.08] tracking-tight">
             Every box,
             <br />
-            <span className="bg-gradient-to-r from-[#FFB877] to-[#F5821F] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#F5821F] to-[#FF9E4D] bg-clip-text text-transparent
+                             dark:from-[#FFB877] dark:to-[#F5821F]">
               on one map.
             </span>
           </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-white/55">
+          <p className="mt-4 text-[15px] leading-relaxed text-[#1B2B5E]/60 dark:text-white/55">
             Sea &amp; air shipments across 160+ carriers, with port-level
             events and delay alerts — the moment they happen.
           </p>
@@ -161,8 +104,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             { n: "Sea + Air", l: "Coverage" },
           ].map((s) => (
             <div key={s.l}>
-              <div className="text-lg font-extrabold text-white">{s.n}</div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+              <div className="text-lg font-extrabold text-[#1B2B5E] dark:text-white">{s.n}</div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-[#1B2B5E]/45 dark:text-white/45">
                 {s.l}
               </div>
             </div>
@@ -192,15 +135,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           &copy; {new Date().getFullYear()} TrackMyContainer — All rights reserved.
         </p>
       </main>
-
-      <style>{`
-        @keyframes auth-dash{to{stroke-dashoffset:0}}
-        @keyframes auth-flow{to{stroke-dashoffset:-340}}
-        @keyframes auth-fadein{to{opacity:1}}
-        @media (prefers-reduced-motion: reduce){
-          [style*="auth-dash"],[style*="auth-flow"],[style*="auth-fadein"]{animation:none!important}
-        }
-      `}</style>
     </div>
   );
 }

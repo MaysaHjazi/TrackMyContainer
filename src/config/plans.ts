@@ -41,7 +41,7 @@ export const PLANS = {
     price:         3500,          // cents — $35/month
     priceLabel:    "$35",
     stripePriceId: process.env.STRIPE_PRO_PRICE_ID,
-    description:   "10 containers/month, ShipsGo, live updates every 6h",
+    description:   "10 containers/month, ShipsGo, live updates",
     badge:         "Most Popular",
     provider:      "shipsgo",
     liveTracking:  true,
@@ -62,7 +62,7 @@ export const PLANS = {
     },
     highlights: [
       "10 containers per billing period",
-      "ShipsGo live tracking (updates every 6h)",
+      "ShipsGo live tracking",
       "Interactive world map & route visualization",
       "Full event history timeline",
       "Auto-updates — never stale",
@@ -98,7 +98,7 @@ export const PLANS = {
     },
     highlights: [
       "Unlimited containers — never blocked",
-      "ShipsGo live tracking (updates every 6h)",
+      "ShipsGo live tracking",
       "All PRO features included",
       "Dedicated account manager",
     ],

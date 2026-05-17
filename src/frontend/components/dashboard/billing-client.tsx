@@ -39,7 +39,7 @@ const PLANS = [
     description: "10 containers/month, ShipsGo, live updates",
     features: [
       "10 containers per billing period",
-      "ShipsGo live tracking (every 6h)",
+      "ShipsGo live tracking",
       "Interactive world map & route viz",
       "Full event history timeline",
       "Auto-updates — never stale",
@@ -55,7 +55,7 @@ const PLANS = [
     description: "Unlimited containers, dedicated support",
     features: [
       "Unlimited containers — never blocked",
-      "ShipsGo live tracking (every 6h)",
+      "ShipsGo live tracking",
       "All PRO features included",
       "Dedicated account manager",
     ],
