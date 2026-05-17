@@ -2,6 +2,7 @@ import twilio from "twilio";
 import { WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
 import { prisma } from "@/backend/lib/db";
 import { isMetaProvider, sendMetaText } from "./whatsapp-meta";
+import { isEvolutionEnabled, sendEvolutionText } from "./evolution";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -44,6 +45,33 @@ export async function sendWhatsApp({
       status:   "PENDING",
     },
   });
+
+  // ── Evolution API path (TEMPORARY WhatsApp Web bridge) ───────
+  // Highest priority when EVOLUTION_ENABLED=true: delivers proactive
+  // ShipsGo updates with NO Meta template / 24h-window limit, until
+  // the official Meta templates are approved. Same human-readable
+  // body the user sees on web / email. Fully isolated — when
+  // disabled this is skipped and Meta/Twilio behave unchanged.
+  if (isEvolutionEnabled()) {
+    try {
+      const id = await sendEvolutionText(toPhone, body);
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  { status: "SENT", externalId: id, sentAt: new Date() },
+      });
+    } catch (err) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  {
+          status:   "FAILED",
+          failedAt: new Date(),
+          error:    err instanceof Error ? err.message : "Evolution send failed",
+        },
+      });
+      throw err;
+    }
+    return;
+  }
 
   // ── Meta WhatsApp Cloud API path ─────────────────────────────
   // Active ONLY when WHATSAPP_PROVIDER=meta + token + phone id are
