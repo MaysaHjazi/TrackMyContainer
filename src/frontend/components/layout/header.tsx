@@ -33,14 +33,14 @@ export function Header() {
           <img
             src="/logo-header-light.png"
             alt="TrackMyContainer"
-            className="block h-10 w-auto dark:hidden
+            className="block h-14 w-auto dark:hidden
                        transition-transform duration-300 group-hover/logo:scale-105"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-header-dark.png"
             alt="TrackMyContainer"
-            className="hidden h-10 w-auto dark:block
+            className="hidden h-14 w-auto dark:block
                        transition-transform duration-300 group-hover/logo:scale-105"
           />
         </Link>
@@ -210,9 +210,9 @@ export function DashboardHeader({ userName }: { userName?: string }) {
       {/* Logo (compact) — same theme-swapped brand artwork */}
       <Link href="/dashboard" className="flex items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-header-light.png" alt="TrackMyContainer" className="block h-8 w-auto dark:hidden" />
+        <img src="/logo-header-light.png" alt="TrackMyContainer" className="block h-10 w-auto dark:hidden" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-8 w-auto dark:block" />
+        <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-10 w-auto dark:block" />
       </Link>
 
       {/* Search */}
