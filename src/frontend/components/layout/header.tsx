@@ -20,36 +20,29 @@ export function Header() {
     <header className="relative z-50 w-full bg-transparent">
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-7 lg:px-10">
 
-        {/* Logo (same in both modes) */}
+        {/* Brand logo — theme-swapped via CSS (no flash; .dark is on
+            <html> from SSR). Light artwork in light mode, dark artwork
+            in dark mode. */}
         <Link
           href="/"
-          aria-label="Container Tracking — home"
-          className="group/logo flex items-center gap-2.5 flex-shrink-0 rounded-md
+          aria-label="TrackMyContainer — home"
+          className="group/logo flex items-center flex-shrink-0 rounded-md
                      focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
         >
-          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl
-                           bg-gradient-to-b from-orange-400 via-orange-500 to-orange-600
-                           ring-1 ring-inset ring-white/20
-                           shadow-[0_4px_12px_-2px_rgba(245,130,31,0.35)]
-                           transition-transform duration-300 group-hover/logo:scale-105">
-            <span className="pointer-events-none absolute inset-x-0 top-0 h-1/2 rounded-t-xl bg-gradient-to-b from-white/25 to-transparent" />
-            <svg viewBox="0 0 24 24" className="relative h-[18px] w-[18px] text-white" fill="none" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="8" width="18" height="10" rx="1.2" stroke="currentColor" />
-              <path d="M7 8v10M12 8v10M17 8v10" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.5" />
-              <circle cx="12" cy="5" r="1.6" fill="currentColor" />
-            </svg>
-          </span>
-          {/* Wordmark — 2 lines stacked */}
-          <span className="flex flex-col leading-none select-none">
-            <span className="text-[13px] font-medium
-                             text-[#1F2937] dark:text-white/90">
-              track my
-            </span>
-            <span className="mt-[3px] text-[14px] font-bold uppercase tracking-[0.15em]
-                             text-[#FF6A00] dark:text-orange-400">
-              container
-            </span>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-header-light.png"
+            alt="TrackMyContainer"
+            className="block h-10 w-auto dark:hidden
+                       transition-transform duration-300 group-hover/logo:scale-105"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-header-dark.png"
+            alt="TrackMyContainer"
+            className="hidden h-10 w-auto dark:block
+                       transition-transform duration-300 group-hover/logo:scale-105"
+          />
         </Link>
 
         {/* Desktop nav */}
@@ -214,12 +207,12 @@ export function DashboardHeader({ userName }: { userName?: string }) {
     <header className="flex h-14 items-center justify-between border-b border-navy-100 bg-white px-6
                         dark:border-navy-800 dark:bg-navy-950">
 
-      {/* Logo (compact) */}
-      <Link href="/dashboard" className="flex items-center gap-1.5">
-        <span className="text-base font-bold">
-          <span className="text-navy-900 dark:text-white">Container</span>
-          <span className="text-orange-500"> Tracking</span>
-        </span>
+      {/* Logo (compact) — same theme-swapped brand artwork */}
+      <Link href="/dashboard" className="flex items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-header-light.png" alt="TrackMyContainer" className="block h-8 w-auto dark:hidden" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-8 w-auto dark:block" />
       </Link>
 
       {/* Search */}
