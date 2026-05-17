@@ -162,8 +162,19 @@ export async function handleProTurn(
   const fresh = await isFreshConversation(phone);
   const ships = user.shipments as ShipmentRow[];
   const t = text.trim();
+  // Anything that *means* "show me my shipments / all of them" —
+  // English or Arabic — counts, not just the literal word "list".
   const wantsList =
-    /\b(hi|hello|hey|start|menu|list|shipments|my shipments)\b/i.test(t);
+    /\b(hi|hello|hey|start|menu|list|all|every|everything|shipments?|containers?|status|update[s]?|track(ing)?|show|give|see|where)\b/i.test(
+      t,
+    ) ||
+    /(شحن|الكل|كل|تتبع|وين|اعطيني|أعطيني|ورّيني|وريني|قائمة|حالة|تحديث)/.test(
+      t,
+    );
+  // A report / summary request.
+  const wantsReport =
+    /\b(report|summary|overview|digest)\b/i.test(t) ||
+    /(تقرير|ملخص|ملخّص|نظرة عامة)/.test(t);
 
   // 1) A shipment number mentioned ANYWHERE in the message
   //    ("what about MAEU9184879", "MAEU9184879?", "track CAIU2444270").
@@ -208,13 +219,37 @@ export async function handleProTurn(
   // Show the full welcome + list ONLY on a fresh conversation or when
   // the user explicitly asks for it. Mid-conversation, an
   // unrecognized message gets a short nudge — no repeated welcome.
-  if (fresh || wantsList) {
+  if (fresh || wantsList || wantsReport) {
     // Show ALL of the user's shipments. WhatsApp caps a single
     // message (~4096 chars), so split into multiple messages when
     // the list is long — the user still gets every shipment.
-    const head = fresh
-      ? `${BRAND}\n\nHere are your shipments:`
-      : `Your shipments:`;
+    let head: string;
+    if (wantsReport) {
+      const label = (s: ShipmentRow) => getStatusLabel(s.currentStatus).toLowerCase();
+      const delayed = ships.filter((s) => label(s).includes("delay")).length;
+      const arrived = ships.filter(
+        (s) => label(s).includes("arriv") || label(s).includes("deliver"),
+      ).length;
+      const moving = ships.length - delayed - arrived;
+      const future = ships
+        .map((s) => s.etaDate)
+        .filter((d): d is Date => !!d && new Date(d).getTime() > Date.now())
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      const next =
+        future.length > 0
+          ? `Next arrival: ${formatDate(future[0])} (in ${daysTo(future[0])} days).`
+          : `No upcoming arrivals.`;
+      head =
+        `📊  Shipments report\n\n` +
+        `Total: ${ships.length}  ·  In transit: ${moving}  ·  ` +
+        `Delayed: ${delayed}  ·  Arrived: ${arrived}\n` +
+        `${next}\n\n` +
+        `Details:`;
+    } else {
+      head = fresh
+        ? `${BRAND}\n\nHere are your shipments:`
+        : `Your shipments:`;
+    }
     const footer =
       `Reply with a list number (e.g. 1) or the full shipment number for details.`;
     const MAX = 3500;
