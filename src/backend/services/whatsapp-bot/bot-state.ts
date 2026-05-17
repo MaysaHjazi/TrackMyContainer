@@ -1,23 +1,21 @@
 import { prisma } from "@/backend/lib/db";
 import { trackShipment } from "@/backend/services/tracking";
 import { formatDate, getStatusLabel } from "@/lib/utils";
-import { runBot, type BotState, type Lang, type TrackView } from "./bot-engine";
+import { runBot, type BotState, type TrackView } from "./bot-engine";
 
 async function loadSession(phone: string) {
   const s = await prisma.whatsappSession.findUnique({ where: { phoneNumber: phone } });
   const state = (s?.state as BotState) ?? "MAIN";
-  const lang = (s?.lang as Lang) ?? "ar";
   return {
     state: (["MAIN", "AWAIT_TRACK", "AWAIT_SAVE"].includes(state) ? state : "MAIN") as BotState,
-    lang: (lang === "en" ? "en" : "ar") as Lang,
   };
 }
 
-async function saveSession(phone: string, state: BotState, lang: Lang) {
+async function saveSession(phone: string, state: BotState) {
   await prisma.whatsappSession.upsert({
     where: { phoneNumber: phone },
-    update: { state, lang, lastMessageAt: new Date(), messageCount: { increment: 1 } },
-    create: { phoneNumber: phone, state, lang, lastMessageAt: new Date(), messageCount: 1 },
+    update: { state, lang: "en", lastMessageAt: new Date(), messageCount: { increment: 1 } },
+    create: { phoneNumber: phone, state, lang: "en", lastMessageAt: new Date(), messageCount: 1 },
   });
 }
 
@@ -30,7 +28,7 @@ async function getSaved(phone: string) {
   return rows.map((r) => ({ trackingNumber: r.trackingNumber, lastStatus: r.lastStatus }));
 }
 
-async function doTrack(lang: Lang, num: string): Promise<TrackView> {
+async function doTrack(num: string): Promise<TrackView> {
   try {
     const r = await trackShipment(num.trim());
     return {
@@ -53,14 +51,14 @@ export interface OutMsg {
 }
 
 export async function handleBotTurn(phone: string, text: string): Promise<OutMsg[]> {
-  const { state, lang } = await loadSession(phone);
+  const { state } = await loadSession(phone);
   let track: TrackView | undefined;
 
-  let out = runBot({ state, lang, text, savedShipments: await getSaved(phone) });
+  let out = runBot({ state, text, savedShipments: await getSaved(phone) });
 
   if (out.action?.kind === "NEED_TRACK" || out.action?.kind === "NEED_TRACK_THEN_SAVE") {
-    track = await doTrack(out.lang, out.action.trackingNumber);
-    out = runBot({ state, lang: out.lang, text, savedShipments: await getSaved(phone), track });
+    track = await doTrack(out.action.trackingNumber);
+    out = runBot({ state, text, savedShipments: await getSaved(phone), track });
   }
 
   if (out.action?.kind === "SAVE" && track?.found) {
@@ -79,6 +77,6 @@ export async function handleBotTurn(phone: string, text: string): Promise<OutMsg
     }
   }
 
-  await saveSession(phone, out.nextState, out.lang);
+  await saveSession(phone, out.nextState);
   return out.replies.map((rp) => ({ type: rp.type, body: rp.body, buttons: rp.buttons }));
 }

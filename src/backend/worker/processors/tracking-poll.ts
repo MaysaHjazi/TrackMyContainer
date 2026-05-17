@@ -5,6 +5,7 @@ import { notificationQueue }       from "@/backend/lib/queue";
 import { prisma }                  from "@/backend/lib/db";
 import { daysUntil }               from "@/lib/utils";
 import { recordEvent }             from "@/lib/audit-log";
+import { isMetaProvider }          from "@/backend/services/notifications/whatsapp-meta";
 
 /**
  * Polls tracking APIs for a single shipment,
@@ -193,11 +194,19 @@ export async function trackingPollProcessor(
   // set on their subscription, plus a phone number on file.
   const emailEnabled =
     shipment.notifyEmail && !!user.email;
-  const whatsappEnabled =
-    shipment.notifyWhatsapp &&
-    !!user.subscription?.whatsappEnabled &&
-    !!user.whatsappOptIn &&
-    !!user.phone;
+
+  // WhatsApp gate:
+  //  • Meta path (WHATSAPP_PROVIDER=meta): mirror email — any PRO/CUSTOM
+  //    user with a phone on file gets the SAME alert on WhatsApp. FREE
+  //    plan is excluded. No per-shipment toggle / opt-in needed.
+  //  • Twilio path (default): unchanged strict gate, byte-for-byte.
+  const plan = user.subscription?.plan ?? "FREE";
+  const whatsappEnabled = isMetaProvider()
+    ? !!user.phone && plan !== "FREE"
+    : shipment.notifyWhatsapp &&
+      !!user.subscription?.whatsappEnabled &&
+      !!user.whatsappOptIn &&
+      !!user.phone;
 
   if (!emailEnabled && !whatsappEnabled) return;
 

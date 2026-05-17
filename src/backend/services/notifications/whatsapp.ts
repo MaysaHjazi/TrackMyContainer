@@ -1,7 +1,7 @@
 import twilio from "twilio";
-import { WHATSAPP_TEMPLATES, META_WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
+import { WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
 import { prisma } from "@/backend/lib/db";
-import { isMetaProvider, sendMetaTemplate } from "./whatsapp-meta";
+import { isMetaProvider, sendMetaText } from "./whatsapp-meta";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -49,15 +49,18 @@ export async function sendWhatsApp({
   // Active ONLY when WHATSAPP_PROVIDER=meta + token + phone id are
   // set. Otherwise we fall straight through to the existing Twilio
   // code below, byte-for-byte unchanged — zero risk to what works.
+  //
+  // We send the SAME human-readable body the user sees on the web /
+  // email as a plain WhatsApp text (sendMetaText) — no pre-approved
+  // template needed. This delivers within the 24h customer-service
+  // window (any user who has messaged the assistant) and for all
+  // verified test recipients. For cold proactive sends to users who
+  // never messaged the business, Meta requires an approved template
+  // — that's the only remaining Meta-side step and does not block
+  // active users or the demo.
   if (isMetaProvider()) {
     try {
-      const meta = META_WHATSAPP_TEMPLATES[templateKey];
-      const id = await sendMetaTemplate({
-        to:           toPhone,
-        templateName: meta.name,
-        language:     meta.language,
-        bodyParams:   meta.params(templateArgs as Record<string, unknown>),
-      });
+      const id = await sendMetaText(toPhone, body);
       await prisma.notification.update({
         where: { id: notification.id },
         data:  { status: "SENT", externalId: id, sentAt: new Date() },
