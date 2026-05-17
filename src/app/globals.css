@@ -254,16 +254,19 @@ html.theme-switching *::after {
    created harsh glare. These calmer, lower-luminance slate tones are
    easy on the eyes while keeping the markers/routes readable. */
 .world-map-panel {
-  --wm-land:        #C8D4E4;
-  --wm-land-hover:  #BBC9DD;
-  --wm-border:      #AAB9CE;
-  --wm-sea-route:   #0E9488;
-  --wm-air-route:   #EA6A12;
-  --wm-port-dot:    #1E3A8A;
-  --wm-port-label:  rgba(30,58,138,0.80);
-  --wm-label-text:  rgba(15,23,42,0.82);
+  /* Calm, near-neutral paper grey (very low blue saturation) so the
+     light map no longer reads as loud/glary. Accents pulled toward
+     the brand navy/orange, kept muted. */
+  --wm-land:        #DCDEE3;
+  --wm-land-hover:  #D0D3DA;
+  --wm-border:      #C2C6CF;
+  --wm-sea-route:   #1B2B5E;
+  --wm-air-route:   #C2410C;
+  --wm-port-dot:    #1B2B5E;
+  --wm-port-label:  rgba(27,43,94,0.70);
+  --wm-label-text:  rgba(27,43,94,0.78);
   --wm-dot-stroke:  #FFFFFF;
-  --wm-panel-bg:    linear-gradient(180deg, #E8EDF3 0%, #DFE6EF 50%, #D7E0EB 100%);
+  --wm-panel-bg:    linear-gradient(180deg, #F0F1F4 0%, #EAEBEF 50%, #E4E6EB 100%);
   background:       var(--wm-panel-bg);
 }
 .dark .world-map-panel {

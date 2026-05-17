@@ -18,7 +18,7 @@ export function Header() {
 
   return (
     <header className="relative z-50 w-full bg-transparent">
-      <div className="mx-auto flex h-[104px] max-w-7xl items-center justify-between px-5 sm:px-7 lg:px-10">
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 sm:px-7 lg:px-10">
 
         {/* Brand logo — theme-swapped via CSS (no flash; .dark is on
             <html> from SSR). Light artwork in light mode, dark artwork
@@ -33,14 +33,14 @@ export function Header() {
           <img
             src="/logo-header-light.png"
             alt="TrackMyContainer"
-            className="block h-[88px] w-auto dark:hidden
+            className="block h-12 w-auto dark:hidden
                        transition-transform duration-300 group-hover/logo:scale-105"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-header-dark.png"
             alt="TrackMyContainer"
-            className="hidden h-[88px] w-auto dark:block
+            className="hidden h-12 w-auto dark:block
                        transition-transform duration-300 group-hover/logo:scale-105"
           />
         </Link>
@@ -204,15 +204,15 @@ function UserMenu({ userName }: { userName?: string }) {
 // ── Dashboard header (inside dashboard layout) ────────────────
 export function DashboardHeader({ userName }: { userName?: string }) {
   return (
-    <header className="flex h-[72px] items-center justify-between border-b border-navy-100 bg-white px-6
+    <header className="flex h-14 items-center justify-between border-b border-navy-100 bg-white px-6
                         dark:border-navy-800 dark:bg-navy-950">
 
       {/* Logo (compact) — same theme-swapped brand artwork */}
       <Link href="/dashboard" className="flex items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-header-light.png" alt="TrackMyContainer" className="block h-14 w-auto dark:hidden" />
+        <img src="/logo-header-light.png" alt="TrackMyContainer" className="block h-9 w-auto dark:hidden" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-14 w-auto dark:block" />
+        <img src="/logo-header-dark.png" alt="TrackMyContainer" className="hidden h-9 w-auto dark:block" />
       </Link>
 
       {/* Search */}

@@ -12,7 +12,6 @@
  *   still a placeholder so it never links to a dead chat.
  */
 
-import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
 
 // Keep digits only — wa.me wants the full international number, no '+'.
@@ -23,18 +22,8 @@ const PREFILL = encodeURIComponent(
 );
 
 export function WhatsAppFab() {
-  const pathname = usePathname();
-
   // No real number configured → render nothing.
   if (NUMBER.length < 8) return null;
-
-  // Hide inside the app shell where it would overlap controls.
-  if (
-    pathname?.startsWith("/dashboard") ||
-    pathname?.startsWith("/admin")
-  ) {
-    return null;
-  }
 
   const href = `https://wa.me/${NUMBER}?text=${PREFILL}`;
 
@@ -45,7 +34,7 @@ export function WhatsAppFab() {
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"
       title="Chat with us on WhatsApp"
-      className="group fixed bottom-6 right-6 z-[900] flex h-14 w-14 items-center
+      className="group fixed bottom-24 right-5 z-[900] flex h-14 w-14 items-center
                  justify-center rounded-full
                  bg-[#F5821F] hover:bg-[#E0710F]
                  text-white
