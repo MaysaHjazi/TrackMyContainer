@@ -1,6 +1,7 @@
 import twilio from "twilio";
-import { WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
+import { WHATSAPP_TEMPLATES, META_WHATSAPP_TEMPLATES, type TemplateKey } from "./templates";
 import { prisma } from "@/backend/lib/db";
+import { isMetaProvider, sendMetaTemplate } from "./whatsapp-meta";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -43,6 +44,37 @@ export async function sendWhatsApp({
       status:   "PENDING",
     },
   });
+
+  // ── Meta WhatsApp Cloud API path ─────────────────────────────
+  // Active ONLY when WHATSAPP_PROVIDER=meta + token + phone id are
+  // set. Otherwise we fall straight through to the existing Twilio
+  // code below, byte-for-byte unchanged — zero risk to what works.
+  if (isMetaProvider()) {
+    try {
+      const meta = META_WHATSAPP_TEMPLATES[templateKey];
+      const id = await sendMetaTemplate({
+        to:           toPhone,
+        templateName: meta.name,
+        language:     meta.language,
+        bodyParams:   meta.params(templateArgs as Record<string, unknown>),
+      });
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  { status: "SENT", externalId: id, sentAt: new Date() },
+      });
+    } catch (err) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  {
+          status:   "FAILED",
+          failedAt: new Date(),
+          error:    err instanceof Error ? err.message : "Meta send failed",
+        },
+      });
+      throw err;
+    }
+    return;
+  }
 
   try {
     const message = await client.messages.create({

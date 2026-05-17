@@ -57,3 +57,81 @@ export const WHATSAPP_TEMPLATES = {
 } as const;
 
 export type TemplateKey = keyof typeof WHATSAPP_TEMPLATES;
+
+/**
+ * Meta WhatsApp Cloud API template mapping.
+ *
+ * Business-initiated WhatsApp messages MUST use a template that was
+ * pre-approved in Meta WhatsApp Manager. Each entry below declares the
+ * approved template `name` + `language` and an ordered `params()` that
+ * returns the body variables ({{1}}, {{2}}, ...) in the SAME order the
+ * approved template expects.
+ *
+ * ⚠️ The template body text you submit for approval in Meta must match
+ * the structure here. Recommended bodies (create these in WhatsApp
+ * Manager → Message Templates, category = UTILITY, language = en):
+ *
+ *  tmc_eta_imminent   "Hi {{1}} 📦 Shipment {{2}} is arriving on {{3}}. Track: {{4}}"
+ *  tmc_delay_alert    "⚠️ Shipment {{1}} delayed. New ETA {{2}}. Track: {{3}}"
+ *  tmc_arrival_notice "✅ Shipment {{1}} arrived at {{2}} on {{3}}. Details: {{4}}"
+ *  tmc_status_change  "📍 {{1}}: status is now {{2}}{{3}}. Track: {{4}}"
+ *  tmc_customs_hold   "🛃 Shipment {{1}} is on customs hold. Track: {{2}}"
+ *  tmc_welcome        "Welcome to TrackMyContainer, {{1}}! Send a container or AWB number to track it."
+ *
+ * The Twilio path (WHATSAPP_TEMPLATES above) is untouched — this map is
+ * only read when WHATSAPP_PROVIDER=meta.
+ */
+export const META_WHATSAPP_TEMPLATES: Record<
+  TemplateKey,
+  { name: string; language: string; params: (a: Record<string, unknown>) => string[] }
+> = {
+  ETA_IMMINENT: {
+    name: "tmc_eta_imminent",
+    language: "en",
+    params: (a) => [
+      String(a.name ?? "there"),
+      String(a.number ?? ""),
+      a.etaDate ? formatDate(new Date(a.etaDate as string)) : "",
+      String(a.url ?? ""),
+    ],
+  },
+  DELAY_ALERT: {
+    name: "tmc_delay_alert",
+    language: "en",
+    params: (a) => [
+      String(a.number ?? ""),
+      a.newEta ? formatDate(new Date(a.newEta as string)) : "",
+      String(a.url ?? ""),
+    ],
+  },
+  ARRIVAL_NOTICE: {
+    name: "tmc_arrival_notice",
+    language: "en",
+    params: (a) => [
+      String(a.number ?? ""),
+      String(a.location ?? ""),
+      a.arrivedAt ? formatDate(new Date(a.arrivedAt as string)) : "",
+      String(a.url ?? ""),
+    ],
+  },
+  STATUS_CHANGE: {
+    name: "tmc_status_change",
+    language: "en",
+    params: (a) => [
+      String(a.number ?? ""),
+      String(a.status ?? ""),
+      a.location ? ` at ${a.location}` : "",
+      String(a.url ?? ""),
+    ],
+  },
+  CUSTOMS_HOLD: {
+    name: "tmc_customs_hold",
+    language: "en",
+    params: (a) => [String(a.number ?? ""), String(a.url ?? "")],
+  },
+  WELCOME: {
+    name: "tmc_welcome",
+    language: "en",
+    params: (a) => [String(a.name ?? "there")],
+  },
+};
