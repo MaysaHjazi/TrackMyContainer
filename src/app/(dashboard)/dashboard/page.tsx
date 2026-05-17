@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/backend/lib/db";
 import { DashboardContent } from "@/frontend/components/dashboard/dashboard-content";
 import { getCoordinates } from "@/lib/port-coordinates";
-import { seaRoute } from "searoute-ts";
 
 /**
  * Dashboard overview — real data from DB.
@@ -71,62 +70,17 @@ export default async function DashboardPage() {
     for (const ev of s.trackingEvents) pushIfKnown(ev.location);
     pushIfKnown(s.destination);
 
-    // ── Maritime polyline (SEA only) ──────────────────────────────
-    // The `route` waypoints (ports) are the SOURCE OF TRUTH straight
-    // from ShipsGo tracking events. ShipsGo does NOT give us the
-    // vessel's GPS breadcrumbs, so the *shape* of the line between two
-    // real consecutive ports is computed with searoute-ts — a maritime
-    // routing lib whose explicit purpose is "realistic-looking
-    // searoutes for visualizations". This bends the path around
-    // continents / through canals instead of cutting straight over
-    // land. AIR shipments keep the great-circle (planes fly straight).
-    let routePolyline: [number, number][] | undefined;
-    let polylineProgressIndex: number | undefined;
-    if (s.type === "SEA" && route.length >= 2) {
-      const dense: [number, number][] = [];
-      for (let i = 0; i < route.length - 1; i++) {
-        const a = route[i];
-        const b = route[i + 1];
-        try {
-          const f = seaRoute(
-            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: a } },
-            { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: b } },
-          );
-          const seg = f?.geometry?.coordinates as [number, number][] | undefined;
-          if (seg && seg.length > 1) {
-            if (dense.length === 0) dense.push(...seg);
-            else dense.push(...seg.slice(1)); // skip duplicated junction
-          } else {
-            if (dense.length === 0) dense.push(a);
-            dense.push(b);
-          }
-        } catch {
-          if (dense.length === 0) dense.push(a);
-          dense.push(b);
-        }
-      }
-      if (dense.length >= 2) {
-        routePolyline = dense;
-        // Map current location onto the dense polyline so travelled
-        // (solid) vs remaining (dashed) splits at the live position.
-        const cur = s.currentLocation ? getCoordinates(s.currentLocation) : { lat: coords.lat, lng: coords.lng };
-        if (cur.lat !== 0 || cur.lng !== 0) {
-          let bi = 0;
-          let bd = Infinity;
-          for (let i = 0; i < dense.length; i++) {
-            const dl = dense[i][0] - cur.lng;
-            const dt = dense[i][1] - cur.lat;
-            const d = dl * dl + dt * dt;
-            if (d < bd) { bd = d; bi = i; }
-          }
-          polylineProgressIndex = bi;
-        }
-      }
-    }
+    // The `route` waypoints are a faithful sequence of the ports the
+    // container has actually been reported at (origin + tracking event
+    // locations + destination, deduped). The map draws straight legs
+    // between consecutive waypoints — we deliberately do NOT try to
+    // synthesise a "real maritime path" client-side, because anything
+    // we generate locally would diverge from what ShipsGo actually
+    // tracks. The events themselves are the source of truth.
 
-    // Find the index of the waypoint (port marker) corresponding to the
-    // current location — used for the marker-level travelled/remaining
-    // split when there is no dense polyline (AIR / fallback).
+    // Find the index of the waypoint corresponding to the current
+    // location so the map can render the leg already travelled (origin
+    // → currentLocation) as a solid line and the remaining leg as dashed.
     let progressIndex: number | undefined;
     if (route.length >= 2 && s.currentLocation) {
       const target = s.currentLocation.toLowerCase().trim();
@@ -162,8 +116,6 @@ export default async function DashboardPage() {
       route,                                        // port waypoints (origin + events + destination, deduped)
       routeLabels,                                  // matching port name per waypoint (for tooltips)
       progressIndex,                                // index into `route` = current waypoint
-      routePolyline,                                // dense maritime path (SEA) — searoute between real ports
-      polylineProgressIndex,                        // index into routePolyline = live position
     };
   });
 
