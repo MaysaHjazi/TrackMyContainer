@@ -54,11 +54,13 @@ function etaPhrase(eta: Date | null): string {
   return `arriving in ~${n} ${n === 1 ? "day" : "days"} (${d})`;
 }
 
-function listLine(s: ShipmentRow): string {
+function listEntry(s: ShipmentRow, i: number): string {
   const status = getStatusLabel(s.currentStatus);
-  const where = s.currentLocation ? `, ${s.currentLocation}` : "";
-  const eta = s.etaDate ? ` — ${etaPhrase(s.etaDate)}` : "";
-  return `•  ${s.trackingNumber} — ${status}${where}${eta}`;
+  const where = s.currentLocation ? ` · ${s.currentLocation}` : "";
+  const eta = s.etaDate ? `\n     ${etaPhrase(s.etaDate)}` : "";
+  // Number on its own line (bold) so it's easy to read & copy,
+  // detail indented below, each shipment separated by a blank line.
+  return `${i}.  *${s.trackingNumber}*\n     ${status}${where}${eta}`;
 }
 
 function detailCard(s: ShipmentRow): string {
@@ -154,11 +156,14 @@ export async function handleProTurn(
     ];
   }
 
-  const body = ships.slice(0, 15).map(listLine).join("\n");
+  const body = ships
+    .slice(0, 15)
+    .map((s, i) => listEntry(s, i + 1))
+    .join("\n\n");
   return [
     `${BRAND}\n\n` +
-      `Welcome back. Here's where your shipments stand:\n\n` +
+      `Here are your shipments:\n\n` +
       `${body}\n\n` +
-      `Send a shipment number for the full story.`,
+      `Reply with any shipment number above for full details.`,
   ];
 }
