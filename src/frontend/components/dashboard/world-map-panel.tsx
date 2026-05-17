@@ -97,24 +97,27 @@ function getStatusText(status: ShipmentStatus): string {
  * Picked for HIGH visual contrast between adjacent shipments — the
  * earlier teal/sky/cyan combination read as a single colour at map
  * scale. Sea routes still skew cool, air routes still skew warm. */
+// SEA: warm BRAND-ORANGE family. The old cool teal/indigo/purple set
+// read as dim, muddy lines on the dark-navy ocean and looked off-brand.
+// These amber→orange→rust shades pop against the navy map while staying
+// distinguishable between adjacent shipments.
 const SEA_PALETTE = [
-  "#00B4C4", // bright teal       — brand
-  "#6366F1", // indigo-violet
-  "#0EA5E9", // sky bright
-  "#A855F7", // purple
-  "#1E3A8A", // deep navy
-  "#10B981", // emerald
-];
-// AIR: shades of the PROJECT BRAND ORANGE (#F5821F) only — every air
-// shipment stays recognisably "brand orange", just lighter/darker per
-// shipment for separation. No off-brand reds/roses.
-const AIR_PALETTE = [
   "#F5821F", // brand orange (canonical)
+  "#FF5C1A", // vivid orange-red
+  "#FFB020", // amber / gold
+  "#E0540C", // burnt orange
+  "#FF8A3D", // light orange
+  "#C2410C", // deep rust
+];
+// AIR: lighter end of the same brand-orange family so air vs. sea is
+// separable by lightness while the whole map stays cohesively orange.
+const AIR_PALETTE = [
   "#FFA04D", // brand +tint
-  "#D96A12", // brand -shade
   "#FFB877", // brand ++tint
-  "#B85410", // brand --shade
   "#FF922E", // brand light
+  "#D96A12", // brand -shade
+  "#FFC899", // soft peach
+  "#B85410", // brand --shade
 ];
 
 function shipmentColor(type: "SEA" | "AIR", index: number): string {
@@ -256,7 +259,7 @@ export function WorldMapPanel({ shipments }: Props) {
             shipments
               .filter((s) => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .flatMap((s) => {
-                const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                const stroke = colorById.get(s.id) ?? (s.type === "SEA" ? "#F5821F" : "#FFA04D");
                 const baseW = 1.6 / position.zoom;
 
                 // Choose the densest path we have: maritime polyline
@@ -288,9 +291,9 @@ export function WorldMapPanel({ shipments }: Props) {
                         from={path[i]}
                         to={to}
                         stroke={stroke}
-                        strokeWidth={baseW * 2.4}
+                        strokeWidth={baseW * 3}
                         strokeLinecap="round"
-                        opacity={0.16}
+                        opacity={0.28}
                       />,
                       <Line
                         key={`route-${s.id}-${i}`}
@@ -309,10 +312,10 @@ export function WorldMapPanel({ shipments }: Props) {
                       from={path[i]}
                       to={to}
                       stroke={stroke}
-                      strokeWidth={baseW * 0.85}
+                      strokeWidth={baseW * 0.9}
                       strokeLinecap="round"
                       strokeDasharray={`${4 / position.zoom} ${3 / position.zoom}`}
-                      opacity={0.45}
+                      opacity={0.6}
                     />
                   );
                 });
@@ -328,7 +331,7 @@ export function WorldMapPanel({ shipments }: Props) {
                 const route = s.route ?? [];
                 if (route.length < 3) return [];
                 const labels = s.routeLabels ?? [];
-                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#F5821F" : "#FFA04D");
                 return route.slice(1, -1).map((pt, i) => (
                   <Marker key={`wp-${s.id}-${i}`} coordinates={pt}>
                     {/* Soft halo */}
@@ -373,7 +376,7 @@ export function WorldMapPanel({ shipments }: Props) {
               .map((s) => {
                 const from = toLngLat(s.origin);
                 const to   = toLngLat(s.destination);
-                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#F5821F" : "#FFA04D");
                 return (
                   <g key={`endpoints-${s.id}`}>
                     {/* Origin — refined departure pin */}
@@ -503,7 +506,7 @@ export function WorldMapPanel({ shipments }: Props) {
 
             // Per-shipment palette colour. Delayed/exception always
             // turns red so it stands out regardless of palette index.
-            const baseColor = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+            const baseColor = colorById.get(s.id) ?? (s.type === "SEA" ? "#F5821F" : "#FFA04D");
             const dotColor = isDelayed ? "#EF4444" : baseColor;
             const glowColor = isDelayed ? "rgba(239,68,68,0.6)" : `${baseColor}99`;
 
@@ -686,7 +689,7 @@ export function WorldMapPanel({ shipments }: Props) {
               style={{
                 background: activeShipment.currentStatus === "DELAYED" || activeShipment.currentStatus === "EXCEPTION"
                   ? "#EF4444"
-                  : activeShipment.type === "SEA" ? "#00B4C4" : "#F5821F",
+                  : activeShipment.type === "SEA" ? "#F5821F" : "#FFA04D",
               }}
             />
 
@@ -838,7 +841,7 @@ export function WorldMapPanel({ shipments }: Props) {
             {shipments
               .filter(s => s.currentStatus !== "DELIVERED" && s.currentStatus !== "AT_PORT")
               .map(s => {
-                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#00B4C4" : "#F5821F");
+                const color = colorById.get(s.id) ?? (s.type === "SEA" ? "#F5821F" : "#FFA04D");
                 const total = (s.route?.length ?? 0);
                 const done  = (s.progressIndex ?? 0) + 1;
                 const pct   = total >= 2 ? Math.round((done / Math.max(total - 0, 1)) * 100) : 0;
