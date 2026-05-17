@@ -28,7 +28,7 @@ export const siteConfig = {
   },
   contact: {
     email: "support@trackmycontainer.info",
-    whatsapp: "+962771501556",
+    whatsapp: "+962771051556",
   },
 };
 
