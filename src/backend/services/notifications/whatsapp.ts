@@ -4,6 +4,7 @@ import { prisma } from "@/backend/lib/db";
 import { isMetaProvider, sendMetaText } from "./whatsapp-meta";
 import { isEvolutionEnabled, sendEvolutionText } from "./evolution";
 import { isUltraMsgEnabled, sendUltraMsgText } from "./ultramsg";
+import { waGateOpen, formatProactiveBody } from "./wa-gate";
 
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -51,8 +52,18 @@ export async function sendWhatsApp({
   // Highest priority when ULTRAMSG_ENABLED=true. Same human-readable
   // body as web / email. No Meta template / 24h-window limit.
   if (isUltraMsgEnabled()) {
+    // SAFETY GATE: master switch OFF or recipient not in test
+    // allowlist → do NOT send (no proactive blast to real people).
+    if (!waGateOpen(toPhone)) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data:  { status: "FAILED", failedAt: new Date(), error: "skipped: whatsapp bot gated" },
+      });
+      return;
+    }
     try {
-      const id = await sendUltraMsgText(toPhone, body);
+      const proBody = formatProactiveBody(notificationType, templateArgs as Record<string, unknown>);
+      const id = await sendUltraMsgText(toPhone, proBody);
       await prisma.notification.update({
         where: { id: notification.id },
         data:  { status: "SENT", externalId: id, sentAt: new Date() },

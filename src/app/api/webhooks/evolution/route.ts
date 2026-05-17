@@ -4,6 +4,7 @@ import {
   parseEvolutionInbound,
   sendEvolutionText,
 } from "@/backend/services/notifications/evolution";
+import { isWhatsappBotEnabled, waAllowed } from "@/backend/services/notifications/wa-gate";
 
 /**
  * Evolution API (WhatsApp Web bridge) inbound webhook — TEMPORARY
@@ -33,15 +34,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (!isWhatsappBotEnabled() || !waAllowed(inbound.from)) {
+    return NextResponse.json({ ok: true, skipped: "gated" });
+  }
+
   console.log(
     `[webhooks/evolution] inbound from=${inbound.from} text=${JSON.stringify(inbound.text)}`,
   );
 
   try {
-    const { handleEvolutionTurn } = await import(
-      "@/backend/services/whatsapp-bot/evolution-bot"
+    const { handleProTurn } = await import(
+      "@/backend/services/whatsapp-bot/whatsapp-pro-bot"
     );
-    const replies = await handleEvolutionTurn(inbound.from, inbound.text);
+    const replies = await handleProTurn(inbound.from, inbound.text);
     console.log(`[webhooks/evolution] replying ${replies.length} msg(s)`);
     for (const body of replies) {
       await sendEvolutionText(inbound.from, body);

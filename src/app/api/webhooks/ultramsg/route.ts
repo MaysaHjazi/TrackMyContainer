@@ -4,6 +4,7 @@ import {
   parseUltraMsgInbound,
   sendUltraMsgText,
 } from "@/backend/services/notifications/ultramsg";
+import { isWhatsappBotEnabled, waAllowed } from "@/backend/services/notifications/wa-gate";
 
 /**
  * UltraMsg (WhatsApp Web gateway) inbound webhook — TEMPORARY demo
@@ -35,15 +36,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // SAFETY GATE: master switch OFF or number not in the test
+  // allowlist → ignore silently (no reply to random people).
+  if (!isWhatsappBotEnabled() || !waAllowed(inbound.from)) {
+    return NextResponse.json({ ok: true, skipped: "gated" });
+  }
+
   console.log(
     `[webhooks/ultramsg] inbound from=${inbound.from} text=${JSON.stringify(inbound.text)}`,
   );
 
   try {
-    const { handleEvolutionTurn } = await import(
-      "@/backend/services/whatsapp-bot/evolution-bot"
+    const { handleProTurn } = await import(
+      "@/backend/services/whatsapp-bot/whatsapp-pro-bot"
     );
-    const replies = await handleEvolutionTurn(inbound.from, inbound.text);
+    const replies = await handleProTurn(inbound.from, inbound.text);
     console.log(`[webhooks/ultramsg] replying ${replies.length} msg(s)`);
     for (const body of replies) {
       await sendUltraMsgText(inbound.from, body);
