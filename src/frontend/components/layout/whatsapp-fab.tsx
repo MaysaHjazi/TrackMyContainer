@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * Floating WhatsApp contact button (FAB).
+ * Floating WhatsApp contact button (FAB) — public-site contact agent.
  *
- * Fixed bottom-right on every page. Opens a wa.me chat with the
- * business number in a new tab. The number lives in
- * `siteConfig.contact.whatsapp` — update that one line + redeploy to
- * change it. If it's still the placeholder, the button hides itself
- * rather than linking to a broken chat.
+ * - Brand-orange (not WhatsApp green); tuned for both light & dark.
+ * - Hidden on /dashboard and /admin: those areas have their own
+ *   bottom-right controls (map zoom / fullscreen) the button would
+ *   cover, and logged-in users have in-app support. It's a "outside"
+ *   (public visitor) contact widget by design.
+ * - Number lives in siteConfig.contact.whatsapp; hides itself if
+ *   still a placeholder so it never links to a dead chat.
  */
 
+import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
 
 // Keep digits only — wa.me wants the full international number, no '+'.
@@ -20,8 +23,18 @@ const PREFILL = encodeURIComponent(
 );
 
 export function WhatsAppFab() {
-  // No real number configured → render nothing (avoids a dead button).
+  const pathname = usePathname();
+
+  // No real number configured → render nothing.
   if (NUMBER.length < 8) return null;
+
+  // Hide inside the app shell where it would overlap controls.
+  if (
+    pathname?.startsWith("/dashboard") ||
+    pathname?.startsWith("/admin")
+  ) {
+    return null;
+  }
 
   const href = `https://wa.me/${NUMBER}?text=${PREFILL}`;
 
@@ -31,15 +44,21 @@ export function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"
-      className="group fixed bottom-5 right-5 z-[1000] flex h-14 w-14 items-center
-                 justify-center rounded-full bg-[#25D366] shadow-[0_8px_24px_rgba(37,211,102,0.45)]
-                 ring-1 ring-black/5 transition-transform duration-200
+      title="Chat with us on WhatsApp"
+      className="group fixed bottom-6 right-6 z-[900] flex h-14 w-14 items-center
+                 justify-center rounded-full
+                 bg-[#F5821F] hover:bg-[#E0710F]
+                 text-white
+                 shadow-[0_10px_30px_-6px_rgba(245,130,31,0.55)]
+                 ring-1 ring-white/30
+                 dark:ring-white/10
+                 transition-[transform,background-color] duration-200
                  hover:scale-110 active:scale-95
                  motion-reduce:transition-none motion-reduce:hover:scale-100"
     >
-      {/* Soft pulsing halo */}
+      {/* Soft pulsing halo — brand orange, subtle so it isn't harsh */}
       <span
-        className="absolute inset-0 rounded-full bg-[#25D366] opacity-60
+        className="absolute inset-0 rounded-full bg-[#F5821F] opacity-40
                    motion-safe:animate-ping"
         aria-hidden
       />

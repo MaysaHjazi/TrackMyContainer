@@ -249,18 +249,21 @@ html.theme-switching *::after {
  * `.dark` class toggles on <html> — pixel-accurate crossfade.
  */
 
-/* World dashboard map (light defaults) */
+/* World dashboard map (light defaults)
+   Softened: the old near-white #FAFCFF gradient + bright blue land
+   created harsh glare. These calmer, lower-luminance slate tones are
+   easy on the eyes while keeping the markers/routes readable. */
 .world-map-panel {
-  --wm-land:        #DCE7F4;
-  --wm-land-hover:  #CBDAEE;
-  --wm-border:      #B5C5DC;
-  --wm-sea-route:   #14B8A6;
-  --wm-air-route:   #F97316;
-  --wm-port-dot:    #1E40AF;
-  --wm-port-label:  rgba(30,64,175,0.85);
-  --wm-label-text:  rgba(15,23,42,0.85);
+  --wm-land:        #C8D4E4;
+  --wm-land-hover:  #BBC9DD;
+  --wm-border:      #AAB9CE;
+  --wm-sea-route:   #0E9488;
+  --wm-air-route:   #EA6A12;
+  --wm-port-dot:    #1E3A8A;
+  --wm-port-label:  rgba(30,58,138,0.80);
+  --wm-label-text:  rgba(15,23,42,0.82);
   --wm-dot-stroke:  #FFFFFF;
-  --wm-panel-bg:    linear-gradient(180deg, #FAFCFF 0%, #F1F6FC 50%, #E9F1FA 100%);
+  --wm-panel-bg:    linear-gradient(180deg, #E8EDF3 0%, #DFE6EF 50%, #D7E0EB 100%);
   background:       var(--wm-panel-bg);
 }
 .dark .world-map-panel {
