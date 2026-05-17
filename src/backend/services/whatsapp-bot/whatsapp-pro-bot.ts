@@ -127,7 +127,7 @@ async function findProUser(phone: string) {
       phone: true,
       shipments: {
         orderBy: [{ etaDate: "asc" }, { createdAt: "desc" }],
-        take: 20,
+        take: 200,
         select: {
           trackingNumber: true,
           currentStatus: true,
@@ -209,17 +209,29 @@ export async function handleProTurn(
   // the user explicitly asks for it. Mid-conversation, an
   // unrecognized message gets a short nudge — no repeated welcome.
   if (fresh || wantsList) {
-    const body = ships
-      .slice(0, 15)
-      .map((s, i) => listEntry(s, i + 1))
-      .join("\n\n");
+    // Show ALL of the user's shipments. WhatsApp caps a single
+    // message (~4096 chars), so split into multiple messages when
+    // the list is long — the user still gets every shipment.
     const head = fresh
       ? `${BRAND}\n\nHere are your shipments:`
       : `Your shipments:`;
-    return [
-      `${head}\n\n${body}\n\n` +
-        `Reply with a list number (e.g. 1) or the full shipment number for details.`,
-    ];
+    const footer =
+      `Reply with a list number (e.g. 1) or the full shipment number for details.`;
+    const MAX = 3500;
+    const msgs: string[] = [];
+    let cur = head;
+    ships.forEach((s, i) => {
+      const entry = `\n\n${listEntry(s, i + 1)}`;
+      if (cur.length + entry.length > MAX) {
+        msgs.push(cur);
+        cur = entry.trimStart();
+      } else {
+        cur += entry;
+      }
+    });
+    cur += `\n\n${footer}`;
+    msgs.push(cur);
+    return msgs;
   }
 
   return [
