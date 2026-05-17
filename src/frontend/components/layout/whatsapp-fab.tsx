@@ -12,6 +12,7 @@
  *   still a placeholder so it never links to a dead chat.
  */
 
+import { usePathname } from "next/navigation";
 import { siteConfig } from "@/config/site";
 
 // Keep digits only — wa.me wants the full international number, no '+'.
@@ -22,8 +23,16 @@ const PREFILL = encodeURIComponent(
 );
 
 export function WhatsAppFab() {
+  const pathname = usePathname();
+
   // No real number configured → render nothing.
   if (NUMBER.length < 8) return null;
+
+  // Inside the app shell the WhatsApp contact lives in the sidebar
+  // rail (muted icon above Sign Out) — don't also float the circle.
+  if (pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   const href = `https://wa.me/${NUMBER}?text=${PREFILL}`;
 
