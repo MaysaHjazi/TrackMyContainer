@@ -55,12 +55,25 @@ async function handleWhatsApp(
   const templateKey = templateKeyMap[type];
   if (!templateKey) throw new Error(`No WhatsApp template for type: ${type}`);
 
+  // STATUS_CHANGE is enqueued with currentStatus/currentLocation (+ an
+  // events[] array) but the WhatsApp body() expects flat status/location
+  // — normalize so the message reads correctly instead of "undefined".
+  const args =
+    type === "STATUS_CHANGE"
+      ? {
+          ...payload,
+          status: payload.currentStatus ?? payload.status ?? "Updated",
+          location:
+            payload.currentLocation ?? payload.location ?? "",
+        }
+      : payload;
+
   await sendWhatsApp({
     userId,
     shipmentId,
     toPhone:          phone,
     templateKey:      templateKey as never,
-    templateArgs:     payload as never,
+    templateArgs:     args as never,
     notificationType: type,
   });
 }
