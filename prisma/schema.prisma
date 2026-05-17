@@ -418,6 +418,7 @@ model WhatsappSession {
   phoneNumber   String    @unique  // E.164
   userId        String?            // linked account (if registered)
   state         String    @default("idle")  // conversation state machine
+  lang          String    @default("ar")  // "ar" | "en" — auto-detected, sticky
   context       Json?              // temporary conversation context
   isOptedIn     Boolean   @default(false)
   optInAt       DateTime?
@@ -428,6 +429,19 @@ model WhatsappSession {
   updatedAt     DateTime  @updatedAt
 
   @@map("whatsapp_sessions")
+}
+
+model WhatsappTrackedShipment {
+  id             String       @id @default(cuid())
+  phoneNumber    String       // E.164 digits, no '+'
+  trackingNumber String
+  trackingType   ShipmentType
+  lastStatus     String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([phoneNumber, trackingNumber])
+  @@index([phoneNumber])
+  @@map("whatsapp_tracked_shipments")
 }
 
 // ══════════════════════════════════════════════════════════════
