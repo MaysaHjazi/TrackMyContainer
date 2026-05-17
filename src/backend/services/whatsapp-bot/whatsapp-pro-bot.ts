@@ -86,6 +86,33 @@ function detailCard(s: ShipmentRow): string {
   return lines.join("\n");
 }
 
+// Treat the conversation as "fresh" (show the welcome) if we haven't
+// heard from this number in the last 6 hours. Uses the isolated
+// WhatsappSession table only — never touches business data.
+const FRESH_MS = 6 * 60 * 60 * 1000;
+
+async function isFreshConversation(phone: string): Promise<boolean> {
+  const s = await prisma.whatsappSession.findUnique({
+    where: { phoneNumber: phone },
+    select: { lastMessageAt: true },
+  });
+  const fresh =
+    !s?.lastMessageAt ||
+    Date.now() - new Date(s.lastMessageAt).getTime() > FRESH_MS;
+  await prisma.whatsappSession.upsert({
+    where: { phoneNumber: phone },
+    update: { lastMessageAt: new Date(), messageCount: { increment: 1 } },
+    create: {
+      phoneNumber: phone,
+      state: "MAIN",
+      lang: "en",
+      lastMessageAt: new Date(),
+      messageCount: 1,
+    },
+  });
+  return fresh;
+}
+
 async function findProUser(phone: string) {
   const want = digits(phone);
   if (!want) return null;
@@ -132,8 +159,11 @@ export async function handleProTurn(
   const user = await findProUser(phone);
   if (!user) return [FREE_MSG];
 
+  const fresh = await isFreshConversation(phone);
   const ships = user.shipments as ShipmentRow[];
   const t = text.trim();
+  const wantsList =
+    /^(hi|hello|hey|start|menu|list|shipments|my shipments)\b/i.test(t);
 
   // Pick by the list position the user just saw (same deterministic
   // order as the list). "2" → second shipment's details.
@@ -154,7 +184,6 @@ export async function handleProTurn(
     ];
   }
 
-  // Otherwise → the shipments overview.
   if (ships.length === 0) {
     return [
       `${BRAND}\n\n` +
@@ -163,14 +192,25 @@ export async function handleProTurn(
     ];
   }
 
-  const body = ships
-    .slice(0, 15)
-    .map((s, i) => listEntry(s, i + 1))
-    .join("\n\n");
+  // Show the full welcome + list ONLY on a fresh conversation or when
+  // the user explicitly asks for it. Mid-conversation, an
+  // unrecognized message gets a short nudge — no repeated welcome.
+  if (fresh || wantsList) {
+    const body = ships
+      .slice(0, 15)
+      .map((s, i) => listEntry(s, i + 1))
+      .join("\n\n");
+    const head = fresh
+      ? `${BRAND}\n\nHere are your shipments:`
+      : `Your shipments:`;
+    return [
+      `${head}\n\n${body}\n\n` +
+        `Reply with a list number (e.g. 1) or the full shipment number for details.`,
+    ];
+  }
+
   return [
-    `${BRAND}\n\n` +
-      `Here are your shipments:\n\n` +
-      `${body}\n\n` +
-      `Reply with a list number (e.g. 1) or the full shipment number for details.`,
+    `Send a shipment number or its list position for details.\n` +
+      `Type *list* to see all your shipments. 🚢`,
   ];
 }
