@@ -160,32 +160,54 @@ function detailCard(s: ShipmentRow): string {
   return L.join("\n");
 }
 
+function isArrived(s: ShipmentRow): boolean {
+  const l = getStatusLabel(s.currentStatus).toLowerCase();
+  return !!s.ataDate || l.includes("arriv") || l.includes("deliver");
+}
+
+/**
+ * Report = every shipment that has NOT arrived yet (still on the way),
+ * each shown with its list position so the user can ask for full
+ * details. The summary line still counts ALL shipments.
+ */
 function buildReport(ships: ShipmentRow[]): string[] {
   const label = (s: ShipmentRow) =>
     getStatusLabel(s.currentStatus).toLowerCase();
   const delayed = ships.filter((s) => label(s).includes("delay")).length;
-  const arrived = ships.filter(
-    (s) => label(s).includes("arriv") || label(s).includes("deliver"),
-  ).length;
-  const moving = ships.length - delayed - arrived;
-  const future = ships
-    .map((s) => s.etaDate)
+  const arrived = ships.filter(isArrived).length;
+  const moving = ships.length - arrived;
+
+  // Keep original positions so "2" maps to the same shipment as the
+  // pick-list / shortcut.
+  const pending = ships
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => !isArrived(s));
+
+  const future = pending
+    .map(({ s }) => s.etaDate)
     .filter((d): d is Date => !!d && new Date(d).getTime() > Date.now())
     .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   const next =
     future.length > 0
       ? `Next arrival: ${formatDate(future[0])} (in ${daysTo(future[0])} days).`
       : `No upcoming arrivals.`;
+
   const head =
     `📊  Shipments report\n\n` +
-    `Total: ${ships.length}  ·  In transit: ${moving}  ·  ` +
+    `Total: ${ships.length}  ·  On the way: ${moving}  ·  ` +
     `Delayed: ${delayed}  ·  Arrived: ${arrived}\n` +
-    `${next}\n\nDetails:`;
+    `${next}\n\n` +
+    (pending.length === 0
+      ? `🎉 All your shipments have arrived.`
+      : `Still on the way (${pending.length}):`);
+
+  if (pending.length === 0) return [head];
+
   const footer = `Reply with a number (e.g. 2) or a shipment number for full details.`;
   const MAX = 3500;
   const msgs: string[] = [];
   let cur = head;
-  ships.forEach((s, i) => {
+  pending.forEach(({ s, i }) => {
     const entry = `\n\n${listEntry(s, i + 1)}`;
     if (cur.length + entry.length > MAX) {
       msgs.push(cur);
