@@ -186,17 +186,18 @@ export function parseInboundMessage(
 ): { from: string; text: string } | null {
   try {
     const p = payload as {
-      entry?: {
-        changes?: {
-          value?: {
-            messages?: { from?: string; text?: { body?: string }; type?: string }[];
-          };
-        }[];
-      }[];
+      entry?: { changes?: { value?: { messages?: {
+        from?: string; type?: string;
+        text?: { body?: string };
+        interactive?: { button_reply?: { id?: string }; list_reply?: { id?: string } };
+      }[] } }[] }[];
     };
-    const msg = p.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    if (!msg?.from || msg.type !== "text" || !msg.text?.body) return null;
-    return { from: msg.from, text: msg.text.body };
+    const m = p.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (!m?.from) return null;
+    if (m.type === "text" && m.text?.body) return { from: m.from, text: m.text.body };
+    const id = m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id;
+    if (id) return { from: m.from, text: id };
+    return null;
   } catch {
     return null;
   }

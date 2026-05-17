@@ -3,11 +3,9 @@ import {
   verifyWebhook,
   parseInboundMessage,
   sendMetaText,
+  sendMetaButtons,
   isMetaProvider,
 } from "@/backend/services/notifications/whatsapp-meta";
-import { handleIncomingWhatsApp } from "@/backend/services/notifications/whatsapp";
-import { trackShipment, TrackingError } from "@/backend/services/tracking";
-import { getStatusLabel, formatDate } from "@/lib/utils";
 
 /**
  * Meta WhatsApp Cloud API webhook.
@@ -31,57 +29,27 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // Always 200 fast so Meta doesn't retry; process inline but guard all.
   if (!isMetaProvider()) {
     return NextResponse.json({ ok: true, skipped: "provider!=meta" });
   }
-
   let payload: unknown;
-  try {
-    payload = await req.json();
-  } catch {
-    return NextResponse.json({ ok: true });
-  }
+  try { payload = await req.json(); } catch { return NextResponse.json({ ok: true }); }
 
   const inbound = parseInboundMessage(payload);
   if (!inbound) return NextResponse.json({ ok: true });
 
   try {
-    const from = inbound.from; // E.164 digits, no '+'
-    const text = inbound.text;
-
-    // OPT IN / OUT / welcome are handled here; null = tracking query.
-    const canned = await handleIncomingWhatsApp({
-      from: `whatsapp:+${from}`,
-      body: text,
-    });
-
-    if (canned) {
-      await sendMetaText(from, canned);
-      return NextResponse.json({ ok: true });
-    }
-
-    // Otherwise treat the message as a tracking number / AWB.
-    try {
-      const result = await trackShipment(text.trim());
-      const latest = result.events?.[result.events.length - 1];
-      const reply =
-        `📦 *${result.trackingNumber}*\n` +
-        `Status: *${getStatusLabel(result.currentStatus)}*\n` +
-        (result.currentLocation ? `Location: ${result.currentLocation}\n` : "") +
-        (result.etaDate ? `ETA: ${formatDate(result.etaDate)}\n` : "") +
-        (latest?.description ? `\nLatest: ${latest.description}` : "");
-      await sendMetaText(from, reply);
-    } catch (err) {
-      const msg =
-        err instanceof TrackingError
-          ? err.message
-          : "Couldn't find that shipment. Send a container number (e.g. MAEU1234567) or AWB (e.g. 157-12345678).";
-      await sendMetaText(from, msg);
+    const { handleBotTurn } = await import("@/backend/services/whatsapp-bot/bot-state");
+    const msgs = await handleBotTurn(inbound.from, inbound.text);
+    for (const m of msgs) {
+      if (m.type === "buttons" && m.buttons?.length) {
+        await sendMetaButtons(inbound.from, m.body, m.buttons);
+      } else {
+        await sendMetaText(inbound.from, m.body);
+      }
     }
   } catch (err) {
-    console.error("[webhooks/whatsapp] handler error:", err);
+    console.error("[webhooks/whatsapp] bot error:", err);
   }
-
   return NextResponse.json({ ok: true });
 }
